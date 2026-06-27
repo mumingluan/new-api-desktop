@@ -1,0 +1,11 @@
+node_modules/
+dist*
+
+web/default/dist/
+web/classic/dist/
+
+*.log
+.DS_Store
+.idea/
+.vscode/
+.zed/

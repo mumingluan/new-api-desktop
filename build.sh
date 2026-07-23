@@ -4,6 +4,8 @@ set -euo pipefail
 
 echo "Building New API Desktop Shell..."
 
+npm run build:classic
+
 if [[ ! -d "web/default/dist" || ! -d "web/classic/dist" ]]; then
   echo "Missing frontend build artifacts."
   echo "Please prepare:"

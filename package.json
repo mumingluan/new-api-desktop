@@ -6,7 +6,8 @@
   "scripts": {
     "start-app": "electron .",
     "dev-app": "cross-env NODE_ENV=development electron .",
-    "build:frontends": "echo \"Prepare web/default/dist and web/classic/dist before packaging.\"",
+    "build:classic": "cd web && bun install --frozen-lockfile && bun run --cwd classic build",
+    "build:frontends": "npm run build:classic",
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win",
@@ -22,7 +23,7 @@
   "author": "QuantumNous",
   "repository": {
     "type": "git",
-    "url": "https://github.com/QuantumNous/new-api"
+    "url": "https://github.com/mumingluan/new-api-desktop"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
@@ -31,7 +32,7 @@
   },
   "build": {
     "appId": "com.newapi.desktop",
-    "productName": "New-API-App",
+    "productName": "New-API-Desktop",
     "publish": null,
     "directories": {
       "output": "dist"

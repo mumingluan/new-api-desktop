@@ -22,26 +22,30 @@
 ### 目录结构
 
 ```text
-electron/
-  main.js                 Electron 主进程、本地代理服务、多窗口管理
-  preload.js              安全 IPC bridge
-  desktop/                桌面端设置页面
-  package.json            Electron 脚本与 electron-builder 配置
-  dist/                   构建输出目录，已被 git 忽略
+main.js                   Electron 主进程、本地代理服务、多窗口管理
+preload.js                安全 IPC bridge
+desktop/                  桌面端设置页面
+web/classic/              经典前端源码
+web/default/dist/         外部准备的新版前端构建产物
+package.json              Electron 脚本与 electron-builder 配置
+dist/                     构建输出目录，已被 git 忽略
 ```
 
 ### 准备 New API 前端
 
-桌面端打包时需要准备 New API 的两个前端构建产物：
+经典前端源码已随本仓库维护，可直接构建：
+
+```bash
+npm run build:classic
+```
+
+新版前端源码继续由 `mumingluan/new-api` 的 `web/` 目录维护。构建新版前端后，将产物复制到：
 
 ```text
 web/default/dist
-web/classic/dist
 ```
 
-可以在仓库根目录的前端项目中自行构建，也可以把已经构建好的产物放到上述位置。
-
-如果你已经准备了 New API 前端源码，可以在相应前端项目中自行构建，然后把产物复制到：
+打包前应同时存在：
 
 ```text
 web/default/dist
@@ -85,8 +89,8 @@ dist
 Windows 构建产物包括：
 
 ```text
-dist/New-API-App Setup 1.0.0.exe
-dist/New-API-App 1.0.0.exe
+dist/New-API-Desktop Setup 1.0.0.exe
+dist/New-API-Desktop 1.0.0.exe
 dist/win-unpacked/
 ```
 
@@ -150,24 +154,30 @@ This is the Electron desktop shell for New API. It does not start or bundle a Go
 ### Layout
 
 ```text
-electron/
-  main.js                 Electron main process, local proxy, window management
-  preload.js              Safe IPC bridge
-  desktop/                Desktop settings UI
-  package.json            Electron scripts and electron-builder config
-  dist/                   Generated build output, ignored by git
+main.js                   Electron main process, local proxy, window management
+preload.js                Safe IPC bridge
+desktop/                  Desktop settings UI
+web/classic/              Classic frontend source
+web/default/dist/         Externally prepared default frontend build
+package.json              Electron scripts and electron-builder config
+dist/                     Generated build output, ignored by git
 ```
 
 ### Prepare New API Frontends
 
-The desktop package expects prebuilt New API frontend assets at:
+The Classic frontend source is maintained in this repository and can be built directly:
+
+```bash
+npm run build:classic
+```
+
+The default frontend source remains in the `web/` directory of `mumingluan/new-api`. Build it there and copy its output to:
 
 ```text
 web/default/dist
-web/classic/dist
 ```
 
-If you have the New API frontend source code, build it in the corresponding frontend projects and copy the outputs to:
+Before packaging, both build outputs must exist:
 
 ```text
 web/default/dist
@@ -209,8 +219,8 @@ dist
 Windows outputs include:
 
 ```text
-dist/New-API-App Setup 1.0.0.exe
-dist/New-API-App 1.0.0.exe
+dist/New-API-Desktop Setup 1.0.0.exe
+dist/New-API-Desktop 1.0.0.exe
 dist/win-unpacked/
 ```
 

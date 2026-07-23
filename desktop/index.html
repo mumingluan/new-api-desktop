@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>New API Desktop</title>
+    <link rel="stylesheet" href="./styles.css?v=desktop-settings-2" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1 data-i18n="title">New API Desktop</h1>
+          <p data-i18n="subtitle">Connect the bundled frontends to any backend.</p>
+        </div>
+        <select id="language"></select>
+      </header>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2 data-i18n="instances">Instances</h2>
+          <button id="newInstance" type="button" data-i18n="new">New</button>
+        </div>
+        <div id="instances" class="instances"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2 data-i18n="instanceSettings">Instance settings</h2>
+        </div>
+        <form id="instanceForm" class="form">
+          <input id="id" type="hidden" />
+          <label>
+            <span data-i18n="name">Name</span>
+            <input id="name" autocomplete="off" />
+          </label>
+          <label>
+            <span data-i18n="backendUrl">Backend URL</span>
+            <input id="baseUrl" data-i18n-placeholder="backendUrlPlaceholder" autocomplete="url" required />
+          </label>
+          <label>
+            <span data-i18n="loginMode">Login mode</span>
+            <select id="authMode">
+              <option value="interactive" data-i18n="interactive">Interactive login</option>
+              <option value="accessToken" data-i18n="accessToken">Access token</option>
+            </select>
+          </label>
+          <label class="token-only">
+            <span data-i18n="userId">User ID</span>
+            <input id="userId" autocomplete="off" />
+          </label>
+          <label class="token-only">
+            <span data-i18n="token">Access token</span>
+            <input id="accessToken" type="password" autocomplete="off" data-i18n-placeholder="tokenPlaceholder" />
+          </label>
+          <div class="actions">
+            <button id="validate" type="button" data-i18n="validate">Validate</button>
+            <button type="submit" data-i18n="save">Save</button>
+          </div>
+          <button id="deleteInstance" class="danger" type="button" data-i18n="delete">Delete instance</button>
+          <p id="status" class="status"></p>
+        </form>
+      </section>
+    </main>
+    <script src="./renderer.js?v=desktop-settings-2"></script>
+  </body>
+</html>

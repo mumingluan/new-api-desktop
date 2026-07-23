@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('newApiDesktop', {
   validateAccessToken: (instance) => ipcRenderer.invoke('desktop:validate-access-token', instance),
   openExternal: (url) => ipcRenderer.invoke('desktop:open-external', url),
   openWindow: (options) => ipcRenderer.invoke('desktop:open-window', options),
+  replaceFrontendStorage: (snapshot) => ipcRenderer.invoke('desktop:replace-frontend-storage', snapshot),
   checkForUpdates: () => ipcRenderer.invoke('desktop:check-for-updates'),
   onConfigChanged: (callback) => {
     const listener = (_event, config) => callback(config)

@@ -14,6 +14,7 @@ const http = require('http')
 const https = require('https')
 const path = require('path')
 const { URL } = require('url')
+const { FrontendStorageStore } = require('./frontend-storage')
 
 let mainWindow
 let settingsWindow
@@ -25,6 +26,7 @@ let config = createDefaultConfig()
 let lastStatus = { ok: false, message: 'Not checked', checkedAt: null }
 let restoringWindows = false
 let openWindowsSaveTimer = null
+let frontendStorageStore
 
 const appServers = new Map()
 const appWindows = new Set()
@@ -170,6 +172,9 @@ function sanitizeInstance(input = {}) {
 
 function loadConfig() {
   configPath = path.join(app.getPath('userData'), 'desktop-config.json')
+  frontendStorageStore = new FrontendStorageStore(
+    path.join(app.getPath('userData'), 'frontend-storage.json'),
+  )
   try {
     if (!fs.existsSync(configPath)) return
     const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'))
@@ -285,7 +290,7 @@ function sendJson(res, status, payload) {
   res.end(body)
 }
 
-function serveFile(res, root, requestPath, fallbackToIndex) {
+function serveFile(res, root, requestPath, fallbackToIndex, context = null) {
   let decodedPath
   try {
     decodedPath = decodeURIComponent(requestPath.split('?')[0])
@@ -317,19 +322,31 @@ function serveFile(res, root, requestPath, fallbackToIndex) {
       'Cache-Control': filePath.endsWith('index.html') || isDesktopAsset ? 'no-store' : 'public, max-age=31536000',
     })
     if (filePath.endsWith('index.html')) {
-      res.end(injectDesktopBootstrap(content.toString('utf8'), root))
+      res.end(injectDesktopBootstrap(content.toString('utf8'), context))
     } else {
       res.end(content)
     }
   })
 }
 
-function injectDesktopBootstrap(html, root) {
-  const context = Array.from(appServers.values()).find((item) => item.frontendRoot === root)
+function serializeForInlineScript(value) {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
+}
+
+function injectDesktopBootstrap(html, context) {
   const instance = context?.instance || getActiveInstance()
+  const flavor = context?.flavor || 'default'
+  const frontendStorage =
+    context && instance && frontendStorageStore ? frontendStorageStore.get(instance.id, flavor) : null
   const bootstrap = {
     desktop: true,
     backend: instance ? { id: instance.id, baseUrl: instance.baseUrl, authMode: instance.authMode } : null,
+    flavor,
     language: resolveLanguage(config.desktopLanguage),
   }
   const user =
@@ -343,11 +360,46 @@ function injectDesktopBootstrap(html, root) {
         }
       : null
   const script = `<script>
-window.__NEW_API_DESKTOP__=${JSON.stringify(bootstrap)};
+window.__NEW_API_DESKTOP__=${serializeForInlineScript(bootstrap)};
 try {
-  localStorage.setItem('i18nextLng', ${JSON.stringify(resolveLanguage(config.desktopLanguage))});
-  localStorage.setItem('language', ${JSON.stringify(resolveLanguage(config.desktopLanguage))});
-  ${user ? `localStorage.setItem('user', ${JSON.stringify(JSON.stringify(user))}); localStorage.setItem('uid', ${JSON.stringify(String(user.id))});` : ''}
+  ${
+    frontendStorage
+      ? `const desktopStorage = ${serializeForInlineScript(frontendStorage)};
+  localStorage.clear();
+  for (const [key, value] of Object.entries(desktopStorage)) localStorage.setItem(key, value);`
+      : ''
+  }
+  localStorage.setItem('i18nextLng', ${serializeForInlineScript(resolveLanguage(config.desktopLanguage))});
+  localStorage.setItem('language', ${serializeForInlineScript(resolveLanguage(config.desktopLanguage))});
+  ${user ? `localStorage.setItem('user', ${serializeForInlineScript(JSON.stringify(user))}); localStorage.setItem('uid', ${serializeForInlineScript(String(user.id))});` : ''}
+
+  ${
+    frontendStorage
+      ? `const persistDesktopStorage = () => {
+    const snapshot = {};
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key !== null) snapshot[key] = localStorage.getItem(key);
+    }
+    window.newApiDesktop?.replaceFrontendStorage(snapshot).catch(() => {});
+  };
+  let persistTimer;
+  const scheduleDesktopStoragePersist = () => {
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(persistDesktopStorage, 50);
+  };
+  for (const method of ['setItem', 'removeItem', 'clear']) {
+    const original = Storage.prototype[method];
+    Storage.prototype[method] = function (...args) {
+      const result = original.apply(this, args);
+      if (this === localStorage) scheduleDesktopStoragePersist();
+      return result;
+    };
+  }
+  scheduleDesktopStoragePersist();
+  addEventListener('beforeunload', persistDesktopStorage);`
+      : ''
+  }
 } catch (_) {}
 </script>`
   return html.includes('</head>') ? html.replace('</head>', `${script}</head>`) : `${script}${html}`
@@ -527,7 +579,7 @@ function startAppServer(context) {
         proxyRequest(req, res, context)
         return
       }
-      serveFile(res, context.frontendRoot, urlPath, true)
+      serveFile(res, context.frontendRoot, urlPath, true, context)
     })
     server.on('error', reject)
     server.listen(0, '127.0.0.1', () => {
@@ -926,6 +978,7 @@ function setupIpc() {
   ipcMain.handle('desktop:delete-instance', (_event, id) => {
     config.instances = config.instances.filter((item) => item.id !== id)
     cookieJars.delete(id)
+    frontendStorageStore?.deleteInstance(id)
     if (config.activeInstanceId === id) config.activeInstanceId = config.instances[0]?.id || ''
     saveConfig()
     return getPublicConfig()
@@ -951,6 +1004,13 @@ function setupIpc() {
   ipcMain.handle('desktop:validate-access-token', (_event, input) => validateAccessToken(input))
   ipcMain.handle('desktop:open-external', (_event, url) => shell.openExternal(url))
   ipcMain.handle('desktop:open-window', (_event, options) => createWindow(options))
+  ipcMain.handle('desktop:replace-frontend-storage', (event, snapshot) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const context = win?.__newApiContext
+    if (!context || !frontendStorageStore) return false
+    frontendStorageStore.replace(context.instance.id, context.flavor, snapshot)
+    return true
+  })
   ipcMain.handle('desktop:check-for-updates', () => checkForUpdates())
 }
 
@@ -999,6 +1059,7 @@ app.on('before-quit', () => {
     openWindowsSaveTimer = null
   }
   saveOpenWindows()
+  frontendStorageStore?.flush()
   for (const context of appServers.values()) stopAppServer(context)
   if (desktopServer) desktopServer.close()
 })

@@ -1,6 +1,6 @@
 {
   "name": "new-api-electron",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "New API - AI Model Gateway Desktop Application",
   "main": "main.js",
   "scripts": {
@@ -44,6 +44,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "frontend-storage.js",
       "desktop/**/*",
       "icon.png",
       "tray-iconTemplate.png",

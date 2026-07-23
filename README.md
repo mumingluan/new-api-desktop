@@ -1,5 +1,7 @@
 # New API Desktop Shell
 
+Desktop packaging and maintenance: **MUML**. The underlying New API project attribution remains unchanged.
+
 ## 中文说明
 
 这是 New API 的 Electron 桌面壳。它不会启动或打包 Go 后端，而是在本地启动一个轻量代理服务，加载已经构建好的 New API 前端资源，并把 API 请求转发到用户配置的远程 New API 后端实例。
@@ -67,6 +69,18 @@ npm run start-app
 开发运行时，桌面壳会从本地的 `web/default/dist` 和 `web/classic/dist` 加载前端资源。
 
 ### 构建
+
+推荐直接运行构建脚本。脚本会先提示准备并复制最新版 New API 前端：
+
+```bat
+build.bat
+```
+
+macOS/Linux：
+
+```bash
+./build.sh
+```
 
 构建 Windows 版本：
 
@@ -197,6 +211,18 @@ npm run start-app
 ```
 
 ### Build
+
+The easiest option is to run the build helper. It first reminds you to build and copy the latest New API frontend:
+
+```bat
+build.bat
+```
+
+On macOS/Linux:
+
+```bash
+./build.sh
+```
 
 Build for Windows:
 

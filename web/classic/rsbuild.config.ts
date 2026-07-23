@@ -103,6 +103,10 @@ export default defineConfig(({ envMode }) => {
     performance: {
       removeConsole: isProd ? ['log'] : false,
       buildCache: {
+        cacheDirectory: path.resolve(
+          __dirname,
+          '../node_modules/.cache/classic',
+        ),
         cacheDigest: [process.env.VITE_REACT_APP_VERSION],
       },
     },

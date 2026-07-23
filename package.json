@@ -1,6 +1,6 @@
 {
   "name": "new-api-electron",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "New API - AI Model Gateway Desktop Application",
   "main": "main.js",
   "scripts": {
@@ -21,6 +21,9 @@
     "claude"
   ],
   "author": "QuantumNous",
+  "contributors": [
+    "MUML (New-API-Desktop maintainer)"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/mumingluan/new-api-desktop"
@@ -33,6 +36,7 @@
   "build": {
     "appId": "com.newapi.desktop",
     "productName": "New-API-Desktop",
+    "copyright": "Copyright © 2026 QuantumNous; New-API-Desktop maintained by MUML",
     "publish": null,
     "directories": {
       "output": "dist"
@@ -91,6 +95,7 @@
     },
     "win": {
       "icon": "icon.png",
+      "legalTrademarks": "New-API-Desktop maintained by MUML",
       "target": [
         "nsis",
         "portable"

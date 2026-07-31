@@ -15,18 +15,31 @@ test('Tauri tool pages load shared i18n and mark translatable content', () => {
 })
 
 test('Android release permits the loopback proxy and avoids system cutouts', () => {
-  const gradle = read('src-tauri/gen/android/app/build.gradle.kts')
-  const activity = read('src-tauri/gen/android/app/src/main/java/com/newapi/desktop/MainActivity.kt')
-  const adaptiveIcon = read('src-tauri/gen/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml')
+  const configureScript = read('scripts/configure-android.js')
   const buildScript = read('scripts/build-android.cmd')
 
-  assert.match(gradle, /manifestPlaceholders\["usesCleartextTraffic"\]\s*=\s*"true"/)
-  assert.match(activity, /WindowInsetsCompat\.Type\.systemBars\(\)/)
-  assert.match(activity, /WindowInsetsCompat\.Type\.displayCutout\(\)/)
-  assert.match(activity, /view\.setPadding\(/)
-  assert.match(adaptiveIcon, /@drawable\/ic_launcher_foreground_inset/)
+  assert.match(configureScript, /manifestPlaceholders\[\"usesCleartextTraffic\"\]/)
+  assert.match(configureScript, /isMinifyEnabled = true/)
+  assert.match(configureScript, /isShrinkResources = true/)
+  assert.match(configureScript, /WindowInsetsCompat\.Type\.systemBars\(\)/)
+  assert.match(configureScript, /WindowInsetsCompat\.Type\.displayCutout\(\)/)
+  assert.match(configureScript, /view\.setPadding\(/)
+  assert.match(configureScript, /@drawable\/ic_launcher_foreground_inset/)
+  assert.match(configureScript, /android:insetLeft=\"8dp\"/)
   assert.match(buildScript, /apksigner\.bat/)
   assert.match(buildScript, /New-API-Desktop_1\.1\.3_arm64-release\.apk/)
+
+  const generatedRoot = path.join(root, 'src-tauri', 'gen', 'android', 'app')
+  if (fs.existsSync(generatedRoot)) {
+    const gradle = read('src-tauri/gen/android/app/build.gradle.kts')
+    const activity = read('src-tauri/gen/android/app/src/main/java/com/newapi/desktop/MainActivity.kt')
+    const adaptiveIcon = read('src-tauri/gen/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml')
+
+    assert.match(gradle, /manifestPlaceholders\["usesCleartextTraffic"\]\s*=\s*"true"/)
+    assert.match(activity, /WindowInsetsCompat\.Type\.systemBars\(\)/)
+    assert.match(activity, /WindowInsetsCompat\.Type\.displayCutout\(\)/)
+    assert.match(adaptiveIcon, /@drawable\/ic_launcher_foreground_inset/)
+  }
 })
 
 test('Android proxy pill controls are centered, draggable, and remember their position', () => {

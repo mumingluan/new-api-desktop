@@ -15,9 +15,10 @@ use uuid::Uuid;
 
 use crate::{
     models::{
-        BackendStatus, BatchOperationInput, BatchOperationResult, Instance, InstanceInput,
-        KeyBatchProfile, KeyBatchProfileInput, KeyQueryInput, KeyQueryLog, KeyQueryProfile,
-        KeyQueryResult, PublicConfig, PublicInstance, PublicKeyBatchProfile, StatsInput, StatsRow,
+        system_locale, BackendStatus, BatchOperationInput, BatchOperationResult, Instance,
+        InstanceInput, KeyBatchProfile, KeyBatchProfileInput, KeyQueryInput, KeyQueryLog,
+        KeyQueryProfile, KeyQueryResult, PublicConfig, PublicInstance, PublicKeyBatchProfile,
+        StatsInput, StatsRow,
     },
     proxy,
     state::AppState,
@@ -145,7 +146,7 @@ async fn public_config(state: &AppState) -> PublicConfig {
         open_windows: config.open_windows,
         active_instance,
         desktop_url: String::new(),
-        app_locale: std::env::var("LANG").unwrap_or_else(|_| "en".into()),
+        app_locale: system_locale(),
         status,
         mobile: cfg!(mobile),
     }

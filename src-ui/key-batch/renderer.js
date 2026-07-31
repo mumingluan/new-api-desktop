@@ -13,6 +13,51 @@ const elements = Object.fromEntries(
   ].map((id) => [id, document.getElementById(id)]),
 )
 
+const messages = {
+  zh: {
+    'Key Batch Operations': '密钥批量操作', 'Database connection': '数据库连接',
+    Disconnected: '未连接', Profile: '配置档', 'New profile': '新建配置档',
+    'Profile name': '配置档名称', 'For example: Production database': '例如：生产数据库',
+    Database: '数据库', Username: '用户名', 'Verify certificate and hostname (recommended)': '验证证书与主机名（推荐）',
+    'Verify certificate': '验证证书', 'Require encryption': '必须加密',
+    'Prefer encryption (allow fallback)': '优先加密（可回退）', 'Disable TLS': '禁用 TLS',
+    Password: '密码', Show: '显示', Hide: '隐藏', 'Connect database': '连接数据库',
+    'Save profile': '保存配置档', 'Delete profile': '删除配置档', Tools: '功能切换',
+    'Batch operations': '批量操作', 'Log statistics': '日志统计', 'Group selection': '分组选择',
+    'Refresh groups': '刷新分组', 'Group name': '分组名', 'Current group': '当前分组',
+    'Connect to view token count': '连接数据库后查看 Token 数量', 'Operation mode': '操作模式',
+    'Extend token expiry': '延长Token过期时间', 'Add token quota': '增加Token额度',
+    'Deduct token expiry': '扣除Token过期时间', 'Deduct token quota': '扣除Token额度',
+    Days: '天', Hours: '时', Minutes: '分', 'Quota in USD': '美元额度',
+    'Only keys that have been used': '仅操作使用过的密钥',
+    'Only keys with remaining quota above': '仅操作剩余额度大于', USD: '美元', Execute: '执行操作',
+    'Operation results': '操作结果', Clear: '清空', 'No operation records': '暂无操作记录',
+    'Query parameters': '查询参数', 'Query statistics': '查询统计', 'Specific date': '指定日期',
+    'Recent N days': '最近N天', Date: '日期', 'Recent days': '最近天数', 'Group by': '分组',
+    'Sort by': '排序', 'Model filter': '模型筛选', 'Fuzzy matching supported': '支持模糊匹配',
+    'Minimum tokens': '最小Token', 'Exclude user ID': '排除用户ID', 'Specific user ID': '指定用户ID',
+    'Overrides excluded user when set': '填写后忽略排除条件', 'Statistics summary': '日志统计汇总',
+    Results: '结果数', Requests: '请求次数', 'Prompt tokens': '输入Token',
+    'Completion tokens': '输出Token', Quota: '配额', 'Statistics results': '统计结果',
+    'Export CSV': '导出 CSV', Name: '名称', 'Quota (USD)': '配额(USD)', 'Unique users': '独立用户数',
+    'Connect to query statistics': '连接数据库后查询日志统计', 'Operation failed': '操作失败',
+    'Leave blank to use saved password': '留空以使用已保存密码', 'Profile saved': 'MySQL 配置档已保存',
+    'Delete MySQL profile “{{name}}”?': '确认删除 MySQL 配置档“{{name}}”？',
+    'Profile deleted': 'MySQL 配置档已删除', Connecting: '连接中...', Connected: '已连接',
+    'Connection failed': '连接失败', 'Connected to {{database}}@{{host}}:{{port}}': '成功连接到 {{database}}@{{host}}:{{port}}',
+    'Loaded {{count}} groups': '已加载 {{count}} 个分组', Querying: '查询中...',
+    'Group “{{group}}”: {{count}} tokens': '分组“{{group}}”：Token {{count}} 个',
+    'Query failed: {{error}}': '查询失败：{{error}}', 'Select a group': '请选择分组名',
+    'This will perform a deduction on group “{{group}}”. Continue?': '将执行扣除操作，分组“{{group}}”。确认继续？',
+    'Executing…': '执行中...', '{{label}}: group “{{group}}”, affected {{count}} tokens': '{{label}}：分组“{{group}}”，影响 {{count}} 个 Token',
+    'Select a statistics date': '请选择统计日期', 'No data': '无数据',
+    'Query complete: {{count}} results': '查询完成，共 {{count}} 条结果', 'CSV exported': 'CSV 已导出',
+  },
+}
+
+let t = (key) => key
+let displayLocale = 'en-US'
+
 const state = {
   profiles: [],
   selectedProfileId: '',
@@ -34,7 +79,7 @@ function showToast(message) {
 }
 
 function errorMessage(error) {
-  return String(error?.message || error || '操作失败').replace(/^Error invoking remote method '[^']+': Error: /, '')
+  return String(error?.message || error || t('Operation failed')).replace(/^Error invoking remote method '[^']+': Error: /, '')
 }
 
 function setConnectionStatus(text, status = '') {
@@ -48,7 +93,7 @@ function setConnected(connected) {
   elements.executeBatch.disabled = !connected
   elements.queryStats.disabled = !connected
   if (!connected) {
-    elements.groupInfo.textContent = '连接数据库后查看 Token 数量'
+    elements.groupInfo.textContent = t('Connect to view token count')
   }
 }
 
@@ -73,7 +118,7 @@ function readConnection() {
 
 function renderProfiles() {
   const selected = state.selectedProfileId
-  elements.profileSelect.replaceChildren(new Option('新建配置档', ''))
+  elements.profileSelect.replaceChildren(new Option(t('New profile'), ''))
   for (const profile of state.profiles) {
     elements.profileSelect.append(new Option(profile.name, profile.id))
   }
@@ -90,11 +135,11 @@ function applyProfile(profile) {
   elements.dbUser.value = profile?.user || 'root'
   elements.dbTlsMode.value = profile?.tlsMode || 'verify_identity'
   elements.dbPassword.value = profile?.password || ''
-  elements.dbPassword.placeholder = profile?.hasPassword ? '留空以使用已保存密码' : ''
+  elements.dbPassword.placeholder = profile?.hasPassword ? t('Leave blank to use saved password') : ''
   elements.profileSelect.value = state.selectedProfileId
   elements.deleteProfile.disabled = !state.selectedProfileId
   setConnected(false)
-  setConnectionStatus('未连接')
+  setConnectionStatus(t('Disconnected'))
 }
 
 async function loadProfiles() {
@@ -112,7 +157,7 @@ async function saveProfile() {
     state.profiles.sort((a, b) => a.name.localeCompare(b.name))
     state.selectedProfileId = saved.id
     renderProfiles()
-    showToast('MySQL 配置档已保存')
+    showToast(t('Profile saved'))
   } catch (error) {
     showToast(errorMessage(error))
   }
@@ -121,33 +166,33 @@ async function saveProfile() {
 async function deleteProfile() {
   if (!state.selectedProfileId) return
   const profile = state.profiles.find((item) => item.id === state.selectedProfileId)
-  if (!window.confirm(`确认删除 MySQL 配置档“${profile?.name || ''}”？`)) return
+  if (!window.confirm(t('Delete MySQL profile “{{name}}”?', { name: profile?.name || '' }))) return
   try {
     await api.deleteKeyBatchProfile(state.selectedProfileId)
     state.profiles = state.profiles.filter((item) => item.id !== state.selectedProfileId)
     renderProfiles()
     applyProfile(state.profiles[0] || null)
-    showToast('MySQL 配置档已删除')
+    showToast(t('Profile deleted'))
   } catch (error) {
     showToast(errorMessage(error))
   }
 }
 
 async function connectDatabase() {
-  setConnectionStatus('连接中...', 'pending')
-  setButtonBusy(elements.connectButton, true, '连接中...')
+  setConnectionStatus(t('Connecting'), 'pending')
+  setButtonBusy(elements.connectButton, true, t('Connecting'))
   try {
     const connected = await api.connectKeyBatchDatabase(readConnection())
     setConnected(true)
-    setConnectionStatus('已连接', 'success')
-    appendOperationLog(`成功连接到 ${connected.database}@${connected.host}:${connected.port}`, 'success')
+    setConnectionStatus(t('Connected'), 'success')
+    appendOperationLog(t('Connected to {{database}}@{{host}}:{{port}}', connected), 'success')
     await loadGroups()
   } catch (error) {
     setConnected(false)
-    setConnectionStatus('连接失败', 'error')
+    setConnectionStatus(t('Connection failed'), 'error')
     showToast(errorMessage(error))
   } finally {
-    setButtonBusy(elements.connectButton, false, '连接中...')
+    setButtonBusy(elements.connectButton, false, t('Connecting'))
   }
 }
 
@@ -164,7 +209,7 @@ async function loadGroups() {
     const groups = await api.getKeyBatchGroups()
     renderGroups(groups)
     if (groups.length && !groups.includes(elements.tokenGroup.value.trim())) elements.tokenGroup.value = groups[0]
-    appendOperationLog(`已加载 ${groups.length} 个分组`, 'success')
+    appendOperationLog(t('Loaded {{count}} groups', { count: groups.length }), 'success')
     await refreshGroupInfo()
   } catch (error) {
     showToast(errorMessage(error))
@@ -177,12 +222,12 @@ async function refreshGroupInfo() {
   if (!state.connected) return
   const group = elements.tokenGroup.value.trim()
   if (!group) return
-  elements.groupInfo.textContent = '查询中...'
+  elements.groupInfo.textContent = t('Querying')
   try {
     const count = await api.countKeyBatchGroup(group)
-    elements.groupInfo.textContent = `分组“${group}”：Token ${Number(count).toLocaleString('zh-CN')} 个`
+    elements.groupInfo.textContent = t('Group “{{group}}”: {{count}} tokens', { group, count: Number(count).toLocaleString(displayLocale) })
   } catch (error) {
-    elements.groupInfo.textContent = `查询失败：${errorMessage(error)}`
+    elements.groupInfo.textContent = t('Query failed: {{error}}', { error: errorMessage(error) })
   }
 }
 
@@ -198,7 +243,7 @@ function setOperationMode(mode) {
 
 function appendOperationLog(message, status = '') {
   state.operationEntries.push({
-    text: `[${new Date().toLocaleString('zh-CN', { hour12: false })}] ${message}`,
+    text: `[${new Date().toLocaleString(displayLocale, { hour12: false })}] ${message}`,
     status,
   })
   renderOperationLog()
@@ -209,7 +254,7 @@ function renderOperationLog() {
   if (!state.operationEntries.length) {
     const empty = document.createElement('p')
     empty.className = 'empty-message'
-    empty.textContent = '暂无操作记录'
+    empty.textContent = t('No operation records')
     elements.operationLog.append(empty)
     return
   }
@@ -224,9 +269,9 @@ function renderOperationLog() {
 
 async function executeBatch() {
   const group = elements.tokenGroup.value.trim()
-  if (!group) return showToast('请选择分组名')
-  if (state.operationMode.startsWith('deduct') && !window.confirm(`将执行扣除操作，分组“${group}”。确认继续？`)) return
-  setButtonBusy(elements.executeBatch, true, '执行中...')
+  if (!group) return showToast(t('Select a group'))
+  if (state.operationMode.startsWith('deduct') && !window.confirm(t('This will perform a deduction on group “{{group}}”. Continue?', { group }))) return
+  setButtonBusy(elements.executeBatch, true, t('Executing…'))
   try {
     const result = await api.executeKeyBatchOperation({
       mode: state.operationMode,
@@ -239,7 +284,14 @@ async function executeBatch() {
       minEnabled: elements.minEnabled.checked,
       minUsd: Number(elements.minUsd.value || 0),
     })
-    const message = `${result.label}：分组“${result.group}”，影响 ${Number(result.affectedRows).toLocaleString('zh-CN')} 个 Token`
+    const labels = {
+      'extend-time': 'Extend token expiry', 'add-quota': 'Add token quota',
+      'deduct-time': 'Deduct token expiry', 'deduct-quota': 'Deduct token quota',
+    }
+    const message = t('{{label}}: group “{{group}}”, affected {{count}} tokens', {
+      label: t(labels[state.operationMode]), group: result.group,
+      count: Number(result.affectedRows).toLocaleString(displayLocale),
+    })
     appendOperationLog(message, 'success')
     showToast(message)
     await refreshGroupInfo()
@@ -248,7 +300,7 @@ async function executeBatch() {
     appendOperationLog(message, 'error')
     showToast(message)
   } finally {
-    setButtonBusy(elements.executeBatch, false, '执行中...')
+    setButtonBusy(elements.executeBatch, false, t('Executing…'))
   }
 }
 
@@ -283,7 +335,7 @@ function statsRange() {
     return { start: Math.floor(start.getTime() / 1000), end: Math.floor(end.getTime() / 1000) }
   }
   const value = elements.statsDate.value
-  if (!value) throw new Error('请选择统计日期')
+  if (!value) throw new Error(t('Select a statistics date'))
   const start = new Date(`${value}T00:00:00`)
   const end = new Date(start)
   end.setDate(end.getDate() + 1)
@@ -302,10 +354,10 @@ function renderStats() {
     completion: sum.completion + Number(row.completionTokens || 0),
     quota: sum.quota + Number(row.quota || 0),
   }), { requests: 0, prompt: 0, completion: 0, quota: 0 })
-  elements.resultCount.textContent = state.statsRows.length.toLocaleString('zh-CN')
-  elements.totalRequests.textContent = totals.requests.toLocaleString('zh-CN')
-  elements.totalPrompt.textContent = totals.prompt.toLocaleString('zh-CN')
-  elements.totalCompletion.textContent = totals.completion.toLocaleString('zh-CN')
+  elements.resultCount.textContent = state.statsRows.length.toLocaleString(displayLocale)
+  elements.totalRequests.textContent = totals.requests.toLocaleString(displayLocale)
+  elements.totalPrompt.textContent = totals.prompt.toLocaleString(displayLocale)
+  elements.totalCompletion.textContent = totals.completion.toLocaleString(displayLocale)
   elements.totalQuota.textContent = quotaMoney(totals.quota)
   elements.exportStatsCsv.disabled = state.statsRows.length === 0
 
@@ -315,7 +367,7 @@ function renderStats() {
     const cell = document.createElement('td')
     cell.className = 'empty'
     cell.colSpan = 6
-    cell.textContent = '无数据'
+    cell.textContent = t('No data')
     row.append(cell)
     elements.statsRows.append(row)
     return
@@ -324,11 +376,11 @@ function renderStats() {
     const row = document.createElement('tr')
     const values = [
       item.name,
-      Number(item.requestCount).toLocaleString('zh-CN'),
-      Number(item.promptTokens).toLocaleString('zh-CN'),
-      Number(item.completionTokens).toLocaleString('zh-CN'),
+      Number(item.requestCount).toLocaleString(displayLocale),
+      Number(item.promptTokens).toLocaleString(displayLocale),
+      Number(item.completionTokens).toLocaleString(displayLocale),
       quotaMoney(item.quota),
-      Number(item.uniqueUsers).toLocaleString('zh-CN'),
+      Number(item.uniqueUsers).toLocaleString(displayLocale),
     ]
     for (const value of values) {
       const cell = document.createElement('td')
@@ -340,7 +392,7 @@ function renderStats() {
 }
 
 async function queryStats() {
-  setButtonBusy(elements.queryStats, true, '查询中...')
+  setButtonBusy(elements.queryStats, true, t('Querying'))
   try {
     const range = statsRange()
     const specifiedUser = elements.userId.value.trim()
@@ -355,11 +407,11 @@ async function queryStats() {
       userId: specifiedUser || null,
     })
     renderStats()
-    showToast(`查询完成，共 ${state.statsRows.length} 条结果`)
+    showToast(t('Query complete: {{count}} results', { count: state.statsRows.length }))
   } catch (error) {
     showToast(errorMessage(error))
   } finally {
-    setButtonBusy(elements.queryStats, false, '查询中...')
+    setButtonBusy(elements.queryStats, false, t('Querying'))
   }
 }
 
@@ -369,13 +421,13 @@ function csvCell(value) {
 
 async function exportStatsCsv() {
   if (!state.statsRows.length) return
-  const rows = [['名称', '请求次数', '输入Token', '输出Token', '配额(USD)', '独立用户数']]
+  const rows = [[t('Name'), t('Requests'), t('Prompt tokens'), t('Completion tokens'), t('Quota (USD)'), t('Unique users')]]
   for (const row of state.statsRows) {
     rows.push([row.name, row.requestCount, row.promptTokens, row.completionTokens, quotaMoney(row.quota), row.uniqueUsers])
   }
   try {
     const saved = await api.exportKeyBatchCsv(`\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`)
-    if (saved) showToast('CSV 已导出')
+    if (saved) showToast(t('CSV exported'))
   } catch (error) {
     showToast(errorMessage(error))
   }
@@ -388,7 +440,7 @@ elements.profileSelect.addEventListener('change', () => {
 elements.togglePassword.addEventListener('click', () => {
   const hidden = elements.dbPassword.type === 'password'
   elements.dbPassword.type = hidden ? 'text' : 'password'
-  elements.togglePassword.textContent = hidden ? '隐藏' : '显示'
+  elements.togglePassword.textContent = hidden ? t('Hide') : t('Show')
 })
 elements.connectButton.addEventListener('click', connectDatabase)
 elements.saveProfile.addEventListener('click', saveProfile)
@@ -408,8 +460,17 @@ elements.exportStatsCsv.addEventListener('click', exportStatsCsv)
 const yesterday = new Date()
 yesterday.setDate(yesterday.getDate() - 1)
 elements.statsDate.value = localDateValue(yesterday)
-setOperationMode(state.operationMode)
-setDateMode(state.dateMode)
-renderOperationLog()
-renderStats()
-loadProfiles().catch((error) => showToast(errorMessage(error)))
+
+async function initialize() {
+  const i18n = await window.createDesktopI18n(messages)
+  t = i18n.t
+  displayLocale = i18n.locale
+  i18n.apply()
+  setOperationMode(state.operationMode)
+  setDateMode(state.dateMode)
+  renderOperationLog()
+  renderStats()
+  await loadProfiles()
+}
+
+initialize().catch((error) => showToast(errorMessage(error)))

@@ -23,7 +23,10 @@ use uuid::Uuid;
 
 #[cfg(desktop)]
 use crate::models::{OpenWindowState, WindowBounds};
-use crate::{models::Instance, state::AppState};
+use crate::{
+    models::{resolve_language, Instance},
+    state::AppState,
+};
 
 const PROXY_PREFIXES: &[&str] = &[
     "/457",
@@ -60,6 +63,45 @@ fn should_proxy(path: &str) -> bool {
         .any(|prefix| path == *prefix || path.starts_with(&format!("{prefix}/")))
 }
 
+fn is_frontend_document_request(request: &Request<Body>) -> bool {
+    if request.method() != axum::http::Method::GET {
+        return false;
+    }
+    let headers = request.headers();
+    let fetches_document = headers
+        .get("sec-fetch-dest")
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.eq_ignore_ascii_case("document"));
+    let accepts_html = headers
+        .get(header::ACCEPT)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| {
+            value
+                .split(',')
+                .any(|item| item.trim().starts_with("text/html"))
+        });
+    fetches_document || accepts_html
+}
+
+fn should_forward_request_header(name: &str) -> bool {
+    !matches!(
+        name,
+        "host"
+            | "connection"
+            | "content-length"
+            | "accept-encoding"
+            | "cookie"
+            | "authorization"
+            | "new-api-user"
+            | "origin"
+            | "referer"
+    )
+}
+
+fn is_internal_app_url(url: &Url) -> bool {
+    url.scheme() == "tauri" || url.host_str() == Some("tauri.localhost")
+}
+
 fn storage_flavor(flavor: &str) -> &str {
     if flavor == "xuancat" {
         "default"
@@ -80,11 +122,7 @@ fn inline_json(value: &Value) -> String {
 
 async fn inject_bootstrap(html: String, context: &ServerContext) -> String {
     let config = context.state.config.read().await;
-    let language = if config.desktop_language == "auto" {
-        "en"
-    } else {
-        &config.desktop_language
-    };
+    let language = resolve_language(&config.desktop_language);
     let user =
         if context.instance.auth_mode == "accessToken" && !context.instance.user_id.is_empty() {
             context.instance.user.clone().or_else(|| {
@@ -116,20 +154,110 @@ async fn inject_bootstrap(html: String, context: &ServerContext) -> String {
             "authMode": context.instance.auth_mode
         },
         "flavor": context.asset_flavor,
-        "language": language,
+        "language": &language,
         "user": user
     });
     let mobile_button = if cfg!(mobile) {
         r#"
-  const back = document.createElement('button');
-  back.type = 'button';
-  back.textContent = '‹';
-  back.setAttribute('aria-label', '返回桌面设置');
-  Object.assign(back.style, {position:'fixed',left:'12px',top:'12px',zIndex:'2147483647',
-    width:'42px',height:'42px',borderRadius:'21px',border:'1px solid rgba(127,127,127,.35)',
-    background:'rgba(20,20,20,.78)',color:'#fff',fontSize:'30px',lineHeight:'34px'});
-  back.addEventListener('click', () => fetch('/__desktop/back', {method:'POST'}));
-  addEventListener('DOMContentLoaded', () => document.body.appendChild(back), {once:true});
+  const mobileControls = document.createElement('div');
+  const backLabels = {zh:'返回桌面设置',fr:'Retour aux paramètres',ja:'設定に戻る',
+    ru:'Вернуться к настройкам',vi:'Quay lại cài đặt',en:'Back to settings'};
+  const refreshLabels = {zh:'刷新页面',fr:'Actualiser la page',ja:'ページを更新',
+    ru:'Обновить страницу',vi:'Làm mới trang',en:'Refresh page'};
+  const language = window.__NEW_API_DESKTOP__.language;
+  const makeControlButton = (label, icon) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('aria-label', label);
+    button.innerHTML = icon;
+    Object.assign(button.style, {width:'40px',height:'36px',padding:'0',border:'0',background:'transparent',
+      color:'inherit',display:'grid',placeItems:'center',lineHeight:'1',touchAction:'none'});
+    return button;
+  };
+  const backButton = makeControlButton(backLabels[language] || backLabels.en,
+    '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="20" height="20"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+  const refreshButton = makeControlButton(refreshLabels[language] || refreshLabels.en,
+    '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="19" height="19"><path d="M19 8a8 8 0 1 0 1 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M19 3v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+  const controlDivider = document.createElement('span');
+  Object.assign(controlDivider.style, {width:'1px',height:'20px',background:'rgba(255,255,255,.22)',pointerEvents:'none'});
+  mobileControls.append(backButton, controlDivider, refreshButton);
+  mobileControls.setAttribute('role', 'group');
+  Object.assign(mobileControls.style, {position:'fixed',left:'12px',top:'12px',zIndex:'2147483647',
+    width:'82px',height:'38px',boxSizing:'border-box',borderRadius:'19px',
+    border:'1px solid rgba(127,127,127,.38)',padding:'0',background:'rgba(20,20,20,.82)',
+    color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',
+    boxShadow:'0 4px 14px rgba(0,0,0,.24)',backdropFilter:'blur(8px)',
+    lineHeight:'1',touchAction:'none',userSelect:'none',webkitUserSelect:'none',cursor:'grab'});
+  const backPositionKey = '__desktopBackButtonPosition';
+  const placeBack = (x, y) => {
+    const edge = 8;
+    const width = mobileControls.offsetWidth || 82;
+    const height = mobileControls.offsetHeight || 38;
+    mobileControls.style.left = `${Math.max(edge, Math.min(x, innerWidth - width - edge))}px`;
+    mobileControls.style.top = `${Math.max(edge, Math.min(y, innerHeight - height - edge))}px`;
+  };
+  let dragState = null;
+  let suppressBackClick = false;
+  mobileControls.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
+    const bounds = mobileControls.getBoundingClientRect();
+    dragState = {pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,
+      left:bounds.left,top:bounds.top,dragged:false};
+    mobileControls.setPointerCapture(event.pointerId);
+    mobileControls.style.cursor = 'grabbing';
+  });
+  mobileControls.addEventListener('pointermove', (event) => {
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    const dx = event.clientX - dragState.startX;
+    const dy = event.clientY - dragState.startY;
+    if (!dragState.dragged && Math.hypot(dx, dy) < 5) return;
+    dragState.dragged = true;
+    placeBack(dragState.left + dx, dragState.top + dy);
+    event.preventDefault();
+  });
+  const finishBackDrag = (event) => {
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    const dragged = dragState.dragged;
+    dragState = null;
+    if (mobileControls.hasPointerCapture(event.pointerId)) mobileControls.releasePointerCapture(event.pointerId);
+    mobileControls.style.cursor = 'grab';
+    if (dragged) {
+      suppressBackClick = true;
+      localStorage.setItem(backPositionKey, JSON.stringify({
+        x:parseFloat(mobileControls.style.left),y:parseFloat(mobileControls.style.top)}));
+      setTimeout(() => { suppressBackClick = false; }, 0);
+      event.preventDefault();
+    }
+  };
+  mobileControls.addEventListener('pointerup', finishBackDrag);
+  mobileControls.addEventListener('pointercancel', finishBackDrag);
+  mobileControls.addEventListener('click', (event) => {
+    if (suppressBackClick) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+  }, true);
+  backButton.addEventListener('click', () => {
+    fetch('/__desktop/back', {method:'POST'});
+  });
+  refreshButton.addEventListener('click', () => reloadCurrentFrontend());
+  const mountBack = () => {
+    document.body.appendChild(mobileControls);
+    try {
+      const saved = JSON.parse(localStorage.getItem(backPositionKey) || 'null');
+      placeBack(Number.isFinite(saved?.x) ? saved.x : 12, Number.isFinite(saved?.y) ? saved.y : 12);
+    } catch (_) {
+      placeBack(12, 12);
+    }
+  };
+  addEventListener('resize', () => placeBack(
+    parseFloat(mobileControls.style.left), parseFloat(mobileControls.style.top)));
+  if (document.readyState === 'loading') {
+    addEventListener('DOMContentLoaded', mountBack, {once:true});
+  } else {
+    mountBack();
+  }
 "#
     } else {
         ""
@@ -138,10 +266,16 @@ async fn inject_bootstrap(html: String, context: &ServerContext) -> String {
         r#"<script>
 window.__NEW_API_DESKTOP__={bootstrap};
 try {{
+  document.documentElement.lang={language};
   const desktopStorage={snapshot};
-  localStorage.clear();
-  for (const [key,value] of Object.entries(desktopStorage)) {{
-    if (typeof value === 'string') localStorage.setItem(key,value);
+  const desktopStorageContext={storage_context};
+  const desktopStorageMarker='__newApiDesktopStorageContext';
+  if (sessionStorage.getItem(desktopStorageMarker) !== desktopStorageContext) {{
+    localStorage.clear();
+    for (const [key,value] of Object.entries(desktopStorage)) {{
+      if (typeof value === 'string') localStorage.setItem(key,value);
+    }}
+    sessionStorage.setItem(desktopStorageMarker,desktopStorageContext);
   }}
   localStorage.setItem('i18nextLng',{language});
   localStorage.setItem('language',{language});
@@ -166,12 +300,38 @@ try {{
     }};
   }}
   addEventListener('beforeunload',persistDesktopStorage);
+  const reloadCurrentFrontend=()=>{{
+    persistDesktopStorage();
+    const next=new URL(location.href);
+    next.searchParams.set('__desktop_reload',Date.now().toString());
+    location.replace(next.href);
+  }};
+  addEventListener('keydown',(event)=>{{
+    const key=String(event.key || '').toLowerCase();
+    const reloadRequested=event.key === 'F5' || ((event.ctrlKey || event.metaKey) && key === 'r');
+    const devtoolsRequested=event.key === 'F12' ||
+      ((event.ctrlKey || event.metaKey) && event.shiftKey && key === 'i');
+    if (reloadRequested) {{
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      reloadCurrentFrontend();
+    }} else if (devtoolsRequested) {{
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      fetch('/__desktop/devtools',{{method:'POST'}});
+    }}
+  }},true);
   {mobile_button}
 }} catch (_) {{}}
 </script>"#,
         bootstrap = inline_json(&bootstrap),
         snapshot = inline_json(&snapshot),
-        language = inline_json(&Value::String(language.to_string())),
+        storage_context = inline_json(&Value::String(format!(
+            "{}:{}",
+            context.instance.id,
+            storage_flavor(&context.flavor)
+        ))),
+        language = inline_json(&Value::String(language)),
         user_script = user
             .map(|value| format!(
                 "localStorage.setItem('user',{});localStorage.setItem('uid',{});",
@@ -245,13 +405,29 @@ async fn navigate_back(context: &ServerContext) -> Response<Body> {
     Response::new(Body::from("{\"ok\":true}"))
 }
 
-async fn serve_asset(context: &ServerContext, path: &str) -> Response<Body> {
+async fn open_devtools(context: &ServerContext) -> Response<Body> {
+    #[cfg(desktop)]
+    if let Some(window) = context.state.app.get_webview_window(&context.window_label) {
+        window.open_devtools();
+    }
+    Response::new(Body::from("{\"ok\":true}"))
+}
+
+fn frontend_asset_path(asset_flavor: &str, path: &str, frontend_document: bool) -> String {
     let relative = path.trim_start_matches('/');
-    let logical = if relative.is_empty() {
-        format!("apps/{}/index.html", context.asset_flavor)
+    if frontend_document || relative.is_empty() {
+        format!("apps/{asset_flavor}/index.html")
     } else {
-        format!("apps/{}/{}", context.asset_flavor, relative)
-    };
+        format!("apps/{asset_flavor}/{relative}")
+    }
+}
+
+async fn serve_asset(
+    context: &ServerContext,
+    path: &str,
+    frontend_document: bool,
+) -> Response<Body> {
+    let logical = frontend_asset_path(&context.asset_flavor, path, frontend_document);
     let resolve = |logical: &str| {
         context
             .state
@@ -260,15 +436,14 @@ async fn serve_asset(context: &ServerContext, path: &str) -> Response<Body> {
             .cloned()
             .unwrap_or_else(|| logical.to_string())
     };
-    let mut resolved = resolve(&logical);
-    let mut asset = context.state.app.asset_resolver().get(resolved.clone());
-    if asset.is_none() {
-        resolved = resolve(&format!("apps/{}/index.html", context.asset_flavor));
-        asset = context.state.app.asset_resolver().get(resolved);
-    }
+    let resolved = resolve(&logical);
+    let asset = context.state.app.asset_resolver().get(resolved);
     let Some(mut asset) = asset else {
         return error_response(StatusCode::NOT_FOUND, "Frontend asset not found");
     };
+    if !frontend_document && asset.mime_type.contains("text/html") && !logical.ends_with(".html") {
+        return error_response(StatusCode::NOT_FOUND, "Frontend asset not found");
+    }
     if logical.ends_with("index.html") || asset.mime_type.contains("text/html") {
         match String::from_utf8(std::mem::take(&mut asset.bytes)) {
             Ok(html) => asset.bytes = inject_bootstrap(html, context).await.into_bytes(),
@@ -280,7 +455,7 @@ async fn serve_asset(context: &ServerContext, path: &str) -> Response<Body> {
         .header(header::CONTENT_TYPE, asset.mime_type)
         .header(
             header::CACHE_CONTROL,
-            if logical.ends_with("index.html") {
+            if frontend_document || logical.ends_with("index.html") {
                 "no-store"
             } else {
                 "public, max-age=31536000, immutable"
@@ -339,10 +514,7 @@ async fn proxy_request(context: &ServerContext, request: Request<Body>) -> Respo
         .request(parts.method.clone(), target)
         .body(reqwest::Body::wrap_stream(body.into_data_stream()));
     for (name, value) in &parts.headers {
-        if matches!(
-            name.as_str(),
-            "host" | "connection" | "content-length" | "accept-encoding" | "cookie"
-        ) {
+        if !should_forward_request_header(name.as_str()) {
             continue;
         }
         outgoing = outgoing.header(name, value);
@@ -482,10 +654,14 @@ async fn handler(
     if path == "/__desktop/back" && request.method() == axum::http::Method::POST {
         return navigate_back(&context).await;
     }
-    if should_proxy(&path) {
+    if path == "/__desktop/devtools" && request.method() == axum::http::Method::POST {
+        return open_devtools(&context).await;
+    }
+    let frontend_document = is_frontend_document_request(&request);
+    if should_proxy(&path) && !frontend_document {
         proxy_request(&context, request).await
     } else {
-        serve_asset(&context, &path).await
+        serve_asset(&context, &path, frontend_document).await
     }
 }
 
@@ -514,6 +690,25 @@ async fn selected_asset_flavor(state: &AppState, instance: &Instance, flavor: &s
         },
         _ => "default".into(),
     }
+}
+
+#[cfg(target_os = "windows")]
+fn disable_browser_accelerator_keys(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    window.with_webview(|webview| unsafe {
+        use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
+        use windows_core::Interface;
+
+        let result: windows_core::Result<()> = (|| {
+            let core_webview = webview.controller().CoreWebView2()?;
+            let settings = core_webview.Settings()?;
+            let settings3: ICoreWebView2Settings3 = settings.cast()?;
+            settings3.SetAreBrowserAcceleratorKeysEnabled(false)?;
+            Ok(())
+        })();
+        if let Err(error) = result {
+            log::warn!("failed to disable WebView2 browser accelerators: {error}");
+        }
+    })
 }
 
 #[cfg(desktop)]
@@ -658,6 +853,8 @@ pub async fn open_frontend_window(
         {
             let allowed_origin = format!("http://127.0.0.1:{port}");
             let app_for_navigation = app.clone();
+            let label_for_navigation = label.clone();
+            let fallback_frontend_url = url.clone();
             let state_for_close = state.clone();
             let label_for_close = label.clone();
             let instance_id_for_events = instance.id.clone();
@@ -689,11 +886,26 @@ pub async fn open_frontend_window(
                 .inner_size(width, height)
                 .min_inner_size(980.0, 640.0)
                 .on_navigation(move |target| {
-                    if target.as_str().starts_with(&allowed_origin)
-                        || target.scheme() == "tauri"
-                        || target.host_str() == Some("tauri.localhost")
-                    {
+                    if target.as_str().starts_with(&allowed_origin) {
                         true
+                    } else if is_internal_app_url(target) {
+                        log::warn!(
+                            "blocked business webview from falling back to internal URL: {target}"
+                        );
+                        let restore_url = app_for_navigation
+                            .get_webview_window(&label_for_navigation)
+                            .and_then(|window| window.url().ok())
+                            .filter(|current| current.as_str().starts_with(&allowed_origin))
+                            .unwrap_or_else(|| fallback_frontend_url.clone());
+                        if let Some(window) =
+                            app_for_navigation.get_webview_window(&label_for_navigation)
+                        {
+                            tauri::async_runtime::spawn(async move {
+                                tokio::task::yield_now().await;
+                                let _ = window.navigate(restore_url);
+                            });
+                        }
+                        false
                     } else {
                         let _ = tauri_plugin_opener::OpenerExt::opener(&app_for_navigation)
                             .open_url(target.as_str(), None::<&str>);
@@ -711,6 +923,8 @@ pub async fn open_frontend_window(
                 builder = builder.position(x as f64, y as f64);
             }
             let window = builder.build().map_err(|error| error.to_string())?;
+            #[cfg(target_os = "windows")]
+            disable_browser_accelerator_keys(&window).map_err(|error| error.to_string())?;
             if options
                 .get("maximized")
                 .and_then(Value::as_bool)
@@ -780,5 +994,78 @@ mod tests {
             cookie_pair("session=old; Max-Age=-1; Path=/"),
             Some(("session".into(), None))
         );
+    }
+
+    #[test]
+    fn strips_browser_auth_and_local_origin_headers() {
+        assert!(!should_forward_request_header("authorization"));
+        assert!(!should_forward_request_header("new-api-user"));
+        assert!(!should_forward_request_header("origin"));
+        assert!(!should_forward_request_header("referer"));
+        assert!(should_forward_request_header("accept-language"));
+        assert!(should_forward_request_header("content-type"));
+    }
+
+    #[test]
+    fn recognizes_internal_tauri_urls_that_business_windows_must_reject() {
+        assert!(is_internal_app_url(
+            &Url::parse("http://tauri.localhost/dashboard/overview").unwrap()
+        ));
+        assert!(is_internal_app_url(
+            &Url::parse("tauri://localhost/").unwrap()
+        ));
+        assert!(!is_internal_app_url(
+            &Url::parse("http://127.0.0.1:3078/dashboard/overview").unwrap()
+        ));
+    }
+
+    #[test]
+    fn spa_document_routes_resolve_directly_to_the_selected_frontend_index() {
+        assert_eq!(
+            frontend_asset_path("xuancat", "/dashboard/overview", true),
+            "apps/xuancat/index.html"
+        );
+        assert_eq!(
+            frontend_asset_path("classic", "/console/token", true),
+            "apps/classic/index.html"
+        );
+        assert_eq!(
+            frontend_asset_path("default", "/static/js/index.js", false),
+            "apps/default/static/js/index.js"
+        );
+    }
+
+    #[test]
+    fn document_navigation_uses_the_bundled_spa_instead_of_the_backend() {
+        let request = Request::builder()
+            .uri("/dashboard/overview")
+            .header("sec-fetch-dest", "document")
+            .header(header::ACCEPT, "text/html,application/xhtml+xml")
+            .body(Body::empty())
+            .unwrap();
+        assert!(should_proxy(request.uri().path()));
+        assert!(is_frontend_document_request(&request));
+    }
+
+    #[test]
+    fn dashboard_api_request_still_reaches_the_backend() {
+        let request = Request::builder()
+            .uri("/dashboard/status")
+            .header(header::ACCEPT, "application/json, text/plain, */*")
+            .body(Body::empty())
+            .unwrap();
+        assert!(should_proxy(request.uri().path()));
+        assert!(!is_frontend_document_request(&request));
+    }
+
+    #[test]
+    fn non_get_html_request_is_not_treated_as_spa_navigation() {
+        let request = Request::builder()
+            .method(axum::http::Method::POST)
+            .uri("/api/data")
+            .header(header::ACCEPT, "text/html")
+            .body(Body::empty())
+            .unwrap();
+        assert!(!is_frontend_document_request(&request));
     }
 }

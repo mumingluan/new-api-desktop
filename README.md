@@ -4,17 +4,17 @@
 Default、Xuancat、Classic 三套前端，并通过仅监听 `127.0.0.1` 的 Rust 代理连接
 用户配置的远程 New API 实例。
 
-当前迁移目标：
+Tauri 客户端覆盖：
 
 - Windows、macOS、Linux 桌面端
 - Android、iOS 移动端
-- 保留 Electron 1.1.3 的实例管理、前端选择、登录、密钥查询、MySQL 批量操作、
+- 实例管理、前端选择、登录、密钥查询、MySQL 批量操作、
   日志统计、CSV 导出、托盘、多窗口和窗口恢复能力
 
 ## 当前验证状态
 
 - Windows x64：已构建 release EXE 和 NSIS 安装包，并通过启动与 WebView 内容验收。
-- Android arm64：已构建带 debug 签名、可直接安装的 APK；包清单和签名已验证。
+- Android arm64：已构建 Release APK，并使用本地 debug 证书签名以便直接安装；包清单和签名已验证。
 - macOS、Linux、iOS：代码和构建入口已准备，但需要在对应宿主系统上完成原生构建验证。
 
 ## 主要功能
@@ -67,12 +67,11 @@ web/*/dist/                三套已构建业务前端（被 Git 忽略）
 scripts/prepare-tauri-assets.js
                            前端去重与打包资源生成
 scripts/build-windows.cmd  固定使用 VS 2022 的 Windows 构建
-scripts/build-android.cmd  固定 SDK/NDK 27 的 Android arm64 debug 构建
+scripts/build-android.cmd  固定 VS 2022、SDK/NDK 27 的 Android arm64 Release 构建
 .tauri-dist/               生成的去重资源（被 Git 忽略）
 ```
 
-仓库根目录仍保留迁移前 Electron 源码与测试，便于行为对照；Tauri 运行时不加载这些
-旧主进程文件。
+仓库仅保留 Tauri 运行时源码；迁移前的 Electron 主进程、重复 UI 和旧测试已清理。
 
 ## 安装依赖
 
@@ -157,12 +156,12 @@ npm run test:rust
 Android 设备安装：
 
 ```bash
-adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+adb install -r src-tauri/gen/android/app/build/outputs/apk/arm64/release/New-API-Desktop_1.1.3_arm64-release.apk
 ```
 
 ## 配置文件
 
-桌面端继续使用原 Electron 目录，以便直接读取现有实例：
+桌面端沿用既有配置目录，以便直接读取迁移前保存的实例：
 
 ```text
 Windows: %APPDATA%/new-api-desktop/

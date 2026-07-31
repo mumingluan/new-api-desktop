@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>密钥查询</title>
+    <title data-i18n="Key Query">密钥查询</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -12,31 +12,31 @@
         <div class="card-heading">
           <div>
             <p class="eyebrow">QUERY</p>
-            <h2>查询条件</h2>
+            <h2 data-i18n="Query conditions">查询条件</h2>
           </div>
-          <span id="queryStatus" class="status-pill">等待查询</span>
+          <span id="queryStatus" class="status-pill" data-i18n="Ready">等待查询</span>
         </div>
 
         <div class="form-grid profile-row">
           <label>
-            <span>常用组合</span>
+            <span data-i18n="Saved profiles">常用组合</span>
             <select id="profileSelect">
-              <option value="">新建组合</option>
+              <option value="" data-i18n="New profile">新建组合</option>
             </select>
           </label>
           <label>
-            <span>组合名称</span>
-            <input id="profileName" autocomplete="off" placeholder="例如：主站个人密钥" />
+            <span data-i18n="Profile name">组合名称</span>
+            <input id="profileName" autocomplete="off" placeholder="例如：主站个人密钥" data-i18n-placeholder="For example: Primary personal key" />
           </label>
         </div>
 
         <div class="form-grid">
           <label>
-            <span>服务器地址</span>
+            <span data-i18n="Server URL">服务器地址</span>
             <input id="baseUrl" autocomplete="url" placeholder="https://api.example.com" />
           </label>
           <label>
-            <span>密钥</span>
+            <span data-i18n="API key">密钥</span>
             <div class="secret-field">
               <input
                 id="apiKey"
@@ -44,38 +44,38 @@
                 autocomplete="off"
                 placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
               />
-              <button id="toggleSecret" class="field-action" type="button">显示</button>
+              <button id="toggleSecret" class="field-action" type="button" data-i18n="Show">显示</button>
             </div>
           </label>
         </div>
 
         <div class="actions">
-          <button id="queryButton" class="primary" type="button">查询</button>
-          <button id="saveProfile" type="button">保存组合</button>
-          <button id="deleteProfile" class="danger" type="button">删除组合</button>
-          <button id="copyInfo" type="button" disabled>复制信息</button>
+          <button id="queryButton" class="primary" type="button" data-i18n="Query">查询</button>
+          <button id="saveProfile" type="button" data-i18n="Save profile">保存组合</button>
+          <button id="deleteProfile" class="danger" type="button" data-i18n="Delete profile">删除组合</button>
+          <button id="copyInfo" type="button" disabled data-i18n="Copy details">复制信息</button>
         </div>
       </section>
 
-      <section class="stats" aria-label="密钥统计">
+      <section class="stats" aria-label="密钥统计" data-i18n-aria-label="Key statistics">
         <article class="stat-card">
-          <span>令牌名称</span>
+          <span data-i18n="Token name">令牌名称</span>
           <strong id="tokenName">--</strong>
         </article>
         <article class="stat-card">
-          <span>总额度</span>
+          <span data-i18n="Total quota">总额度</span>
           <strong id="balance">--</strong>
         </article>
         <article class="stat-card">
-          <span>已使用</span>
+          <span data-i18n="Used">已使用</span>
           <strong id="usage">--</strong>
         </article>
         <article class="stat-card">
-          <span>剩余额度</span>
+          <span data-i18n="Remaining quota">剩余额度</span>
           <strong id="remaining">--</strong>
         </article>
         <article class="stat-card">
-          <span>有效期</span>
+          <span data-i18n="Expires">有效期</span>
           <strong id="accessUntil">--</strong>
         </article>
       </section>
@@ -84,11 +84,11 @@
         <div class="card-heading logs-heading">
           <div>
             <p class="eyebrow">DETAILS</p>
-            <h2>调用详情</h2>
+            <h2 data-i18n="Usage details">调用详情</h2>
           </div>
           <div class="table-actions">
             <label class="page-size">
-              <span>每页</span>
+              <span data-i18n="Per page">每页</span>
               <select id="pageSize">
                 <option>10</option>
                 <option>20</option>
@@ -96,7 +96,7 @@
                 <option>100</option>
               </select>
             </label>
-            <button id="exportCsv" type="button" disabled>导出 CSV</button>
+            <button id="exportCsv" type="button" disabled data-i18n="Export CSV">导出 CSV</button>
           </div>
         </div>
 
@@ -104,22 +104,22 @@
           <table>
             <thead>
               <tr>
-                <th>时间</th>
-                <th>令牌名称</th>
-                <th>分组</th>
-                <th>模型</th>
-                <th>用时</th>
-                <th>流式</th>
-                <th>提示</th>
-                <th>补全</th>
-                <th>花费</th>
-                <th>倍率</th>
-                <th>详情</th>
+                <th data-i18n="Time">时间</th>
+                <th data-i18n="Token name">令牌名称</th>
+                <th data-i18n="Group">分组</th>
+                <th data-i18n="Model">模型</th>
+                <th data-i18n="Duration">用时</th>
+                <th data-i18n="Streaming">流式</th>
+                <th data-i18n="Prompt">提示</th>
+                <th data-i18n="Completion">补全</th>
+                <th data-i18n="Cost">花费</th>
+                <th data-i18n="Ratios">倍率</th>
+                <th data-i18n="Details">详情</th>
               </tr>
             </thead>
             <tbody id="logRows">
               <tr>
-                <td class="empty" colspan="11">输入服务器和密钥开始查询</td>
+                <td class="empty" colspan="11" data-i18n="Enter a server and key to begin">输入服务器和密钥开始查询</td>
               </tr>
             </tbody>
           </table>
@@ -128,9 +128,9 @@
         <footer class="pagination">
           <span id="pageSummary">共 0 条</span>
           <div>
-            <button id="previousPage" type="button" disabled>上一页</button>
+            <button id="previousPage" type="button" disabled data-i18n="Previous">上一页</button>
             <span id="pageIndicator">1 / 1</span>
-            <button id="nextPage" type="button" disabled>下一页</button>
+            <button id="nextPage" type="button" disabled data-i18n="Next">下一页</button>
           </div>
         </footer>
       </section>
@@ -138,6 +138,7 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="../tauri-bridge.js"></script>
+    <script src="../i18n.js"></script>
     <script src="./renderer.js"></script>
   </body>
 </html>

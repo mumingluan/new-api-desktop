@@ -33,5 +33,32 @@ call node scripts\configure-android.js
 if errorlevel 1 exit /b %errorlevel%
 call npm run prepare:tauri-assets
 if errorlevel 1 exit /b %errorlevel%
-call npx tauri android build --debug --apk --target aarch64 --ci %*
-exit /b %errorlevel%
+call npx tauri android build --apk --target aarch64 --split-per-abi --ci %*
+if errorlevel 1 exit /b %errorlevel%
+
+set "UNSIGNED_APK=src-tauri\gen\android\app\build\outputs\apk\arm64\release\app-arm64-release-unsigned.apk"
+set "SIGNED_APK=src-tauri\gen\android\app\build\outputs\apk\arm64\release\New-API-Desktop_1.1.3_arm64-release.apk"
+set "DEBUG_KEYSTORE=%USERPROFILE%\.android\debug.keystore"
+set "APKSIGNER="
+for /f "delims=" %%I in ('dir /b /ad /o-n "%ANDROID_HOME%\build-tools"') do (
+  if not defined APKSIGNER if exist "%ANDROID_HOME%\build-tools\%%I\apksigner.bat" set "APKSIGNER=%ANDROID_HOME%\build-tools\%%I\apksigner.bat"
+)
+if not defined APKSIGNER (
+  echo Error: apksigner was not found under "%ANDROID_HOME%\build-tools".
+  exit /b 1
+)
+if not exist "%DEBUG_KEYSTORE%" (
+  echo Error: Android debug keystore was not found at "%DEBUG_KEYSTORE%".
+  exit /b 1
+)
+if not exist "%UNSIGNED_APK%" (
+  echo Error: Android release APK was not found at "%UNSIGNED_APK%".
+  exit /b 1
+)
+
+call "%APKSIGNER%" sign --ks "%DEBUG_KEYSTORE%" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out "%SIGNED_APK%" "%UNSIGNED_APK%"
+if errorlevel 1 exit /b %errorlevel%
+call "%APKSIGNER%" verify --verbose --print-certs "%SIGNED_APK%"
+if errorlevel 1 exit /b %errorlevel%
+echo Signed installable APK: %CD%\%SIGNED_APK%
+exit /b 0

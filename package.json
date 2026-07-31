@@ -18,7 +18,7 @@
     "ios:init": "tauri ios init",
     "ios:dev": "tauri ios dev",
     "ios:build": "tauri ios build",
-    "test": "node --test frontend-storage.test.js key-query-store.test.js key-query-service.test.js key-query-ui.test.js user-data-migration.test.js key-batch-store.test.js key-batch-service.test.js key-batch-ui.test.js scripts/prepare-tauri-assets.test.js",
+    "test": "node --test scripts/prepare-tauri-assets.test.js scripts/tauri-ui.test.js",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml",
     "build:classic": "cd web && bun install --frozen-lockfile && bun run --cwd classic build"
@@ -45,7 +45,6 @@
     "@tauri-apps/plugin-updater": "^2.10.1"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.4",
-    "mysql2": "^3.23.2"
+    "@tauri-apps/cli": "^2.11.4"
   }
 }

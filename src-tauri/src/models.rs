@@ -1,6 +1,30 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+pub const SUPPORTED_LANGUAGES: &[&str] = &["en", "zh", "fr", "ja", "ru", "vi"];
+
+pub fn system_locale() -> String {
+    sys_locale::get_locale().unwrap_or_else(|| "en".into())
+}
+
+pub fn resolve_language(value: &str) -> String {
+    let locale = if value.is_empty() || value == "auto" {
+        system_locale()
+    } else {
+        value.to_string()
+    };
+    let normalized = locale.replace('_', "-").to_ascii_lowercase();
+    if normalized.starts_with("zh") {
+        return "zh".into();
+    }
+    let language = normalized.split('-').next().unwrap_or("en");
+    if SUPPORTED_LANGUAGES.contains(&language) {
+        language.into()
+    } else {
+        "en".into()
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WindowBounds {
@@ -346,4 +370,17 @@ fn default_top() -> u32 {
 
 fn default_min_tokens() -> i64 {
     1
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolves_supported_language_variants() {
+        assert_eq!(resolve_language("zh-CN"), "zh");
+        assert_eq!(resolve_language("zh_Hant_TW"), "zh");
+        assert_eq!(resolve_language("ja-JP"), "ja");
+        assert_eq!(resolve_language("unsupported"), "en");
+    }
 }

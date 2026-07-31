@@ -1,311 +1,190 @@
-# New API Desktop Shell
+# New API Desktop（Tauri 2）
 
-Desktop packaging and maintenance: **MUML**. The underlying New API project attribution remains unchanged.
+这是 New API 的跨平台客户端壳。项目不内置 Go 后端，而是加载已经构建好的
+Default、Xuancat、Classic 三套前端，并通过仅监听 `127.0.0.1` 的 Rust 代理连接
+用户配置的远程 New API 实例。
 
-## 中文说明
+当前迁移目标：
 
-这是 New API 的 Electron 桌面壳。它不会启动或打包 Go 后端，而是在本地启动一个轻量代理服务，加载已经构建好的 New API 前端资源，并把 API 请求转发到用户配置的远程 New API 后端实例。
+- Windows、macOS、Linux 桌面端
+- Android、iOS 移动端
+- 保留 Electron 1.1.3 的实例管理、前端选择、登录、密钥查询、MySQL 批量操作、
+  日志统计、CSV 导出、托盘、多窗口和窗口恢复能力
 
-### 功能
+## 当前验证状态
 
-- 配置任意 New API 后端地址。
-- 管理多个后端实例。
-- 从托盘菜单为任意实例启动新版前端或经典前端。
-- 启动新版前端时探测后端 `/457`：仅当响应严格包含 `"457": true` 时加载
-  `web/xuancat/dist`，其余情况加载 `web/default/dist`；经典前端不参与探测。
-- 托盘提供独立“密钥查询”窗口，可查询任意兼容服务器的额度、有效期和调用记录，
-  并保存独立于桌面后端列表的常用服务器—密钥组合。
-- “密钥查询”下方提供“密钥批量操作”，支持按 MySQL Token 分组批量增减额度、
-  延长/扣除有效期，以及按日期、模型、用户等条件汇总并导出日志统计。
-- 支持同一实例打开多个窗口，也支持多个实例同时打开。
-- 支持交互式登录和 Access token 登录。
-- 已保存的 Access token 不会在设置界面明文显示；验证和保存时可继续复用。
-- 退出应用时保存仍打开的前端窗口，下次启动自动恢复。
-- 前端窗口标题保留实例名称后缀，便于区分窗口。
-- 支持常用桌面快捷键：
-  - `F5` / `Ctrl+R`：刷新
-  - `F12` / `Ctrl+Shift+I`：开发者工具
-- 前端窗口右键支持复制、剪切、粘贴、全选等常用操作。
+- Windows x64：已构建 release EXE 和 NSIS 安装包，并通过启动与 WebView 内容验收。
+- Android arm64：已构建带 debug 签名、可直接安装的 APK；包清单和签名已验证。
+- macOS、Linux、iOS：代码和构建入口已准备，但需要在对应宿主系统上完成原生构建验证。
 
-### 目录结构
+## 主要功能
+
+- 管理多个 New API 后端实例。
+- 支持交互式 Cookie 登录和 Access Token 登录。
+- 每个实例、每套前端的 Cookie 与 localStorage 相互隔离并持久化。
+- Default 启动前探测 `/457`，仅严格返回 `"457": true` 时选择 Xuancat 资源。
+- 桌面端托盘、多实例多窗口、窗口位置/大小/最大化状态恢复。
+- 桌面端保留 `F5` / `Ctrl+R` 刷新和 `F12` / `Ctrl+Shift+I` 开发者工具快捷键。
+- 移动端在同一 WebView 内切换设置页、业务前端、密钥查询和密钥批量工具。
+- 密钥查询：额度、有效期、调用日志、CSV 原生保存对话框。
+- MySQL 批量操作：按组增减额度和有效期、过滤 Token、汇总日志并导出 CSV。
+
+## 安全设计
+
+- 设置页面只能调用显式定义的 Tauri 命令；远程业务 WebView 不在 Tauri capability
+  的窗口白名单内。
+- 代理仅监听 `127.0.0.1`，并按实例隔离 Cookie、Access Token 和 User ID。
+- 已保存 Access Token 只向前端返回掩码，不返回原值。
+- MySQL 密码不会返回给前端 JavaScript；保存或连接时留空可由 Rust 后端复用原值。
+- MySQL 新配置默认验证 TLS 证书和主机名，也可显式选择验证 CA、仅要求加密、优先
+  加密或禁用 TLS。
+- MySQL 批量 SQL 使用固定语句、字段白名单和参数绑定，不接受任意 SQL。
+- 数据库连接池限制为 3 个连接，并配置连接获取和空闲超时。
+- 外部链接仅允许 `http`、`https`、`mailto`。
+- 本地 JSON 采用临时文件替换；Unix 下设置为 `0600`。
+
+按项目要求，本迁移**没有**使用系统凭据库或 Stronghold。Access Token、MySQL 密码
+和交互式 Cookie 仍保存在应用自己的 JSON 文件中；它们不会暴露给远程业务页面，
+但本地配置目录应视为敏感数据并纳入操作系统账号权限和备份策略。
+
+## 前端体积优化
+
+构建前运行 `scripts/prepare-tauri-assets.js`：
+
+1. 复制设置页和工具页到 `.tauri-dist`。
+2. 对三套业务前端逐文件计算 SHA-256。
+3. 相同内容仅保留一份物理文件，在 `asset-aliases.json` 中记录逻辑路径映射。
+
+当前资源集包含 283 个唯一文件和 317 个别名，减少约 53 MiB 重复数据。运行时 Rust
+代理透明解析别名，三套前端的原始 URL 不需要改变。
+
+## 目录
 
 ```text
-main.js                   Electron 主进程、本地代理服务、多窗口管理
-preload.js                安全 IPC bridge
-desktop/                  桌面端设置页面
-web/classic/              经典前端源码
-web/default/dist/         外部准备的新版前端构建产物
-web/xuancat/dist/         外部准备的 Xuancat 前端构建产物
-key-query/                独立密钥查询窗口
-key-batch/                密钥批量操作与日志统计窗口
-package.json              Electron 脚本与 electron-builder 配置
-dist/                     构建输出目录，已被 git 忽略
+src-tauri/                 Rust/Tauri 应用、代理、存储、托盘与原生命令
+src-ui/                    设置页、密钥查询、密钥批量工具
+web/*/dist/                三套已构建业务前端（被 Git 忽略）
+scripts/prepare-tauri-assets.js
+                           前端去重与打包资源生成
+scripts/build-windows.cmd  固定使用 VS 2022 的 Windows 构建
+scripts/build-android.cmd  固定 SDK/NDK 27 的 Android arm64 debug 构建
+.tauri-dist/               生成的去重资源（被 Git 忽略）
 ```
 
-### 准备 New API 前端
+仓库根目录仍保留迁移前 Electron 源码与测试，便于行为对照；Tauri 运行时不加载这些
+旧主进程文件。
 
-经典前端源码已随本仓库维护，可直接构建：
+## 安装依赖
 
 ```bash
-npm run build:classic
+npm ci
 ```
 
-新版前端源码继续由 `mumingluan/new-api` 的 `web/` 目录维护。分别构建两个版本并复制到：
+还需要：
 
-```text
-web/default/dist   <- VITE_LANDING_PAGE_VARIANT=default
-web/xuancat/dist   <- VITE_LANDING_PAGE_VARIANT=xuancat
-```
+- Rust stable
+- Windows：Visual Studio 2022 Build Tools（Desktop development with C++）
+- Android：Android SDK、NDK `27.0.12077973`、JDK 17 或 21，以及 Rust Android target
+- macOS/iOS：Xcode 和对应 Rust target
 
-打包前应同时存在：
-
-```text
-web/default/dist
-web/xuancat/dist
-web/classic/dist
-```
-
-### 安装依赖
+## 开发
 
 ```bash
-npm install
+npm run dev
 ```
 
-### 开发运行
+## 构建
 
-```bash
-npm run start-app
-```
-
-开发运行时，桌面壳会从本地的 `web/default/dist` 和 `web/classic/dist` 加载前端资源。
-
-### 构建
-
-推荐直接运行构建脚本。脚本会先提示准备并复制最新版 New API 前端：
+Windows：
 
 ```bat
-build.bat
-```
-
-macOS/Linux：
-
-```bash
-./build.sh
-```
-
-构建 Windows 版本：
-
-```bash
 npm run build:win
 ```
 
-构建当前平台版本：
+脚本只选择 VS 2022，不会使用或安装 VS 2026。输出：
+
+```text
+src-tauri/target/release/new-api-desktop.exe
+src-tauri/target/release/bundle/nsis/New API Desktop_1.1.3_x64-setup.exe
+```
+
+macOS：
 
 ```bash
-npm run build
+npm run build:mac
 ```
 
-构建产物输出到：
-
-```text
-dist
-```
-
-Windows 构建产物包括：
-
-```text
-dist/New-API-Desktop Setup 1.1.3.exe
-dist/New-API-Desktop 1.1.3.exe
-dist/win-unpacked/
-```
-
-### 配置文件
-
-桌面端配置保存在 Electron 的 `userData` 目录中，文件名为：
-
-```text
-desktop-config.json
-```
-
-Windows 常见路径：
-
-```text
-%APPDATA%/new-api-desktop/desktop-config.json
-```
-
-主要字段：
-
-- `instances`：后端实例列表。
-- `openWindows`：退出前仍打开、下次启动需要恢复的前端窗口。
-- `desktopLanguage`：桌面壳语言。
-- `updateFeedUrl`：可选的自动更新地址。
-
-### Git 忽略
-
-以下目录属于构建产物，不应提交到 git：
-
-```text
-dist*
-web/default/dist
-web/classic/dist
-```
-
-### 说明
-
-- 桌面壳通过 localhost 提供同源前端页面，并代理请求到远程后端。
-- Access token 模式下不会把浏览器 Cookie 转发到后端，避免被后端误判为过期会话。
-- Access token 模式下会对 `/api/user/passkey` 状态查询做兼容处理，避免 Passkey 探测触发登录跳转。
-- OAuth / Passkey 的实际能力仍取决于后端配置和桌面 Chromium 环境支持。
-
-## English
-
-This is the Electron desktop shell for New API. It does not start or bundle a Go backend. Instead, it serves prebuilt New API frontend assets locally and proxies API requests to one or more remote New API backend instances configured by the user.
-
-### Features
-
-- Connect to any New API backend URL.
-- Manage multiple backend instances.
-- Launch the default frontend or classic frontend for any instance from the tray menu.
-- Probe `/457` before launching the new frontend. A strict `"457": true` response selects
-  `web/xuancat/dist`; all other results select `web/default/dist`. Classic is unchanged.
-- Open the independent Key Query window from the tray, query any compatible server, and
-  save server-key profiles separately from the managed desktop backends.
-- Open Key Batch Operations directly below Key Query to update token quota/expiry by MySQL
-  group and aggregate or export log statistics by date, model, and user filters.
-- Open multiple windows for the same instance or for different instances.
-- Support interactive login and Access token login.
-- Reuse saved Access tokens without displaying them in the settings UI.
-- Restore open frontend windows after restarting the desktop app.
-- Keep the backend instance name in the frontend window title.
-- Support common shortcuts:
-  - `F5` / `Ctrl+R`: reload
-  - `F12` / `Ctrl+Shift+I`: developer tools
-- Provide copy, cut, paste, and select-all context menu actions.
-
-### Layout
-
-```text
-main.js                   Electron main process, local proxy, window management
-preload.js                Safe IPC bridge
-desktop/                  Desktop settings UI
-web/classic/              Classic frontend source
-web/default/dist/         Externally prepared default frontend build
-web/xuancat/dist/         Externally prepared Xuancat frontend build
-key-query/                Independent key-query window
-key-batch/                Token batch operations and log-statistics window
-package.json              Electron scripts and electron-builder config
-dist/                     Generated build output, ignored by git
-```
-
-### Prepare New API Frontends
-
-The Classic frontend source is maintained in this repository and can be built directly:
+Linux：
 
 ```bash
-npm run build:classic
+npm run build:linux
 ```
 
-The frontend source remains in the `web/` directory of `mumingluan/new-api`. Build both variants and copy their outputs to:
-
-```text
-web/default/dist   <- VITE_LANDING_PAGE_VARIANT=default
-web/xuancat/dist   <- VITE_LANDING_PAGE_VARIANT=xuancat
-```
-
-Before packaging, both build outputs must exist:
-
-```text
-web/default/dist
-web/xuancat/dist
-web/classic/dist
-```
-
-### Install Dependencies
-
-```bash
-npm install
-```
-
-### Development
-
-```bash
-npm run start-app
-```
-
-### Build
-
-The easiest option is to run the build helper. It first reminds you to build and copy the latest New API frontend:
+Android 初始化和 arm64 debug APK：
 
 ```bat
-build.bat
+npm run android:init
+npm run android:build
 ```
 
-On macOS/Linux:
+输出：
+
+```text
+src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+```
+
+Android release 构建默认不带发行签名；正式发布前必须配置自己的 keystore：
 
 ```bash
-./build.sh
+npm run android:build:release
 ```
 
-Build for Windows:
+iOS（必须在 macOS/Xcode 环境运行）：
 
 ```bash
-npm run build:win
+npm run ios:init
+npm run ios:build
 ```
 
-Build for the current platform:
+## 测试
 
 ```bash
-npm run build
+npm test
+npm run check:rust
+npm run test:rust
 ```
 
-Build outputs are written to:
+Android 设备安装：
+
+```bash
+adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+```
+
+## 配置文件
+
+桌面端继续使用原 Electron 目录，以便直接读取现有实例：
 
 ```text
-dist
+Windows: %APPDATA%/new-api-desktop/
 ```
 
-Windows outputs include:
+主要文件：
 
 ```text
-dist/New-API-Desktop Setup 1.1.3.exe
-dist/New-API-Desktop 1.1.3.exe
-dist/win-unpacked/
+desktop-config.json        实例、语言、窗口状态、更新地址
+frontend-storage.json      每实例/前端 localStorage
+backend-cookies.json       每实例交互式登录 Cookie
+key-query-profiles.json    密钥查询配置
+key-batch-profiles.json    MySQL 配置（含密码）
 ```
 
-### Configuration
+移动端使用系统分配的应用数据目录。
 
-Desktop settings are stored in Electron's `userData` directory:
+## 更新
 
-```text
-desktop-config.json
-```
+更新检查只接受 HTTPS Tauri updater JSON 地址。自动下载和安装必须在发布流程中配置
+签名公钥；未配置签名时不会以不安全方式安装更新。
 
-Typical Windows path:
+## License
 
-```text
-%APPDATA%/new-api-desktop/desktop-config.json
-```
-
-Key fields:
-
-- `instances`: backend instances.
-- `openWindows`: frontend windows restored on next launch.
-- `desktopLanguage`: desktop shell language.
-- `updateFeedUrl`: optional update feed URL.
-
-### Git Ignore
-
-Generated outputs should stay out of git:
-
-```text
-dist*
-web/default/dist
-web/classic/dist
-```
-
-### Notes
-
-- The shell serves the frontend through localhost and proxies API requests to the selected remote backend.
-- Browser cookies are not forwarded in Access token mode.
-- `/api/user/passkey` status checks are handled defensively in Access token mode to avoid session-login redirects.
-- OAuth and Passkey behavior still depends on backend configuration and Chromium desktop support.
+AGPL-3.0-or-later。New API 原项目归属保持不变；桌面/移动打包与维护：MUML。

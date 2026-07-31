@@ -1,6 +1,9 @@
 node_modules/
 web/node_modules/
 dist*
+.tauri-dist/
+src-tauri/gen/
+src-tauri/target/
 
 web/default/dist/
 web/xuancat/dist/

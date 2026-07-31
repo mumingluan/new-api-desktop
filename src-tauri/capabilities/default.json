@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Local application UI capability",
+  "windows": [
+    "main",
+    "settings",
+    "key-query",
+    "key-batch"
+  ],
+  "permissions": [
+    "core:default"
+  ]
+}

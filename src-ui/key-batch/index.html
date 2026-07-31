@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>密钥批量操作</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="card connection-card">
+        <div class="card-heading">
+          <div>
+            <p class="eyebrow">MYSQL</p>
+            <h2>数据库连接</h2>
+          </div>
+          <span id="connectionStatus" class="status-pill">未连接</span>
+        </div>
+
+        <div class="form-grid profile-row">
+          <label>
+            <span>配置档</span>
+            <select id="profileSelect">
+              <option value="">新建配置档</option>
+            </select>
+          </label>
+          <label>
+            <span>配置档名称</span>
+            <input id="profileName" autocomplete="off" placeholder="例如：生产数据库" />
+          </label>
+        </div>
+
+        <div class="form-grid connection-grid">
+          <label>
+            <span>Host</span>
+            <input id="dbHost" autocomplete="off" value="localhost" />
+          </label>
+          <label>
+            <span>Port</span>
+            <input id="dbPort" type="number" min="1" max="65535" value="3306" />
+          </label>
+          <label>
+            <span>数据库</span>
+            <input id="dbName" autocomplete="off" value="new-api" />
+          </label>
+          <label>
+            <span>用户名</span>
+            <input id="dbUser" autocomplete="username" value="root" />
+          </label>
+          <label>
+            <span>TLS</span>
+            <select id="dbTlsMode">
+              <option value="verify_identity" selected>验证证书与主机名（推荐）</option>
+              <option value="verify_ca">验证证书</option>
+              <option value="required">必须加密</option>
+              <option value="preferred">优先加密（可回退）</option>
+              <option value="disabled">禁用 TLS</option>
+            </select>
+          </label>
+          <label class="password-label">
+            <span>密码</span>
+            <div class="secret-field">
+              <input id="dbPassword" type="password" autocomplete="off" />
+              <button id="togglePassword" class="field-action" type="button">显示</button>
+            </div>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="connectButton" class="primary" type="button">连接数据库</button>
+          <button id="saveProfile" type="button">保存配置档</button>
+          <button id="deleteProfile" class="danger" type="button">删除配置档</button>
+        </div>
+      </section>
+
+      <nav class="tabs" aria-label="功能切换">
+        <button class="tab-button active" data-tab="batch" type="button">批量操作</button>
+        <button class="tab-button" data-tab="stats" type="button">日志统计</button>
+      </nav>
+
+      <section id="batchPanel" class="tab-panel active">
+        <section class="card">
+          <div class="card-heading compact-heading">
+            <div>
+              <p class="eyebrow">TOKENS</p>
+              <h2>分组选择</h2>
+            </div>
+            <button id="refreshGroups" type="button" disabled>刷新分组</button>
+          </div>
+          <div class="form-grid group-grid">
+            <label>
+              <span>分组名</span>
+              <input id="tokenGroup" list="groupOptions" value="default" autocomplete="off" />
+              <datalist id="groupOptions"></datalist>
+            </label>
+            <div class="info-box">
+              <span>当前分组</span>
+              <strong id="groupInfo">连接数据库后查看 Token 数量</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="card operation-card">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">BATCH</p>
+              <h2>操作模式</h2>
+            </div>
+          </div>
+
+          <div class="choice-row" id="operationModes">
+            <button class="choice active" data-mode="extend-time" type="button">延长Token过期时间</button>
+            <button class="choice" data-mode="add-quota" type="button">增加Token额度</button>
+            <button class="choice" data-mode="deduct-time" type="button">扣除Token过期时间</button>
+            <button class="choice" data-mode="deduct-quota" type="button">扣除Token额度</button>
+          </div>
+
+          <div class="form-grid operation-grid">
+            <label class="time-input">
+              <span>天</span>
+              <input id="days" type="number" min="0" value="30" />
+            </label>
+            <label class="time-input">
+              <span>时</span>
+              <input id="hours" type="number" min="0" value="0" />
+            </label>
+            <label class="time-input">
+              <span>分</span>
+              <input id="minutes" type="number" min="0" value="0" />
+            </label>
+            <label class="quota-input">
+              <span>美元额度</span>
+              <input id="dollars" type="number" min="0" step="0.01" value="10" disabled />
+            </label>
+          </div>
+
+          <div class="filter-row">
+            <label class="check-field">
+              <input id="usedOnly" type="checkbox" />
+              <span>仅操作使用过的密钥</span>
+            </label>
+            <label class="check-field">
+              <input id="minEnabled" type="checkbox" />
+              <span>仅操作剩余额度大于</span>
+            </label>
+            <label class="inline-input">
+              <input id="minUsd" type="number" min="0" step="0.01" value="0" disabled />
+              <span>美元</span>
+            </label>
+            <button id="executeBatch" class="primary" type="button" disabled>执行操作</button>
+          </div>
+        </section>
+
+        <section class="card result-card">
+          <div class="card-heading compact-heading">
+            <div>
+              <p class="eyebrow">RESULTS</p>
+              <h2>操作结果</h2>
+            </div>
+            <button id="clearOperationLog" type="button">清空</button>
+          </div>
+          <div id="operationLog" class="operation-log">
+            <p class="empty-message">暂无操作记录</p>
+          </div>
+        </section>
+      </section>
+
+      <section id="statsPanel" class="tab-panel">
+        <section class="card">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">STATISTICS</p>
+              <h2>查询参数</h2>
+            </div>
+            <button id="queryStats" class="primary" type="button" disabled>查询统计</button>
+          </div>
+
+          <div class="choice-row date-modes">
+            <button class="choice active" data-date-mode="date" type="button">指定日期</button>
+            <button class="choice" data-date-mode="recent" type="button">最近N天</button>
+          </div>
+
+          <div class="form-grid stats-filter-grid">
+            <label id="dateField">
+              <span>日期</span>
+              <input id="statsDate" type="date" />
+            </label>
+            <label id="recentDaysField" class="hidden">
+              <span>最近天数</span>
+              <input id="recentDays" type="number" min="1" value="7" />
+            </label>
+            <label>
+              <span>Top N</span>
+              <input id="topN" type="number" min="1" max="1000" value="10" />
+            </label>
+            <label>
+              <span>分组</span>
+              <select id="groupBy">
+                <option value="token_name">token_name</option>
+                <option value="model_name">model_name</option>
+                <option value="username">username</option>
+                <option value="channel_name">channel_name</option>
+                <option value="user_id">user_id</option>
+              </select>
+            </label>
+            <label>
+              <span>排序</span>
+              <select id="sortBy">
+                <option value="count">count</option>
+                <option value="prompt_tokens">prompt_tokens</option>
+                <option value="completion_tokens">completion_tokens</option>
+                <option value="quota">quota</option>
+              </select>
+            </label>
+            <label>
+              <span>模型筛选</span>
+              <input id="modelFilter" autocomplete="off" placeholder="支持模糊匹配" />
+            </label>
+            <label>
+              <span>最小Token</span>
+              <input id="minTokens" type="number" min="1" value="1" />
+            </label>
+            <label>
+              <span>排除用户ID</span>
+              <input id="excludeUserId" type="number" value="1" />
+            </label>
+            <label>
+              <span>指定用户ID</span>
+              <input id="userId" type="number" placeholder="填写后忽略排除条件" />
+            </label>
+          </div>
+        </section>
+
+        <section class="stats" aria-label="日志统计汇总">
+          <article class="stat-card">
+            <span>结果数</span>
+            <strong id="resultCount">0</strong>
+          </article>
+          <article class="stat-card">
+            <span>请求次数</span>
+            <strong id="totalRequests">0</strong>
+          </article>
+          <article class="stat-card">
+            <span>输入Token</span>
+            <strong id="totalPrompt">0</strong>
+          </article>
+          <article class="stat-card">
+            <span>输出Token</span>
+            <strong id="totalCompletion">0</strong>
+          </article>
+          <article class="stat-card">
+            <span>配额</span>
+            <strong id="totalQuota">$0.0000</strong>
+          </article>
+        </section>
+
+        <section class="card stats-results-card">
+          <div class="card-heading compact-heading">
+            <div>
+              <p class="eyebrow">RESULTS</p>
+              <h2>统计结果</h2>
+            </div>
+            <button id="exportStatsCsv" type="button" disabled>导出 CSV</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>名称</th>
+                  <th>请求次数</th>
+                  <th>输入Token</th>
+                  <th>输出Token</th>
+                  <th>配额(USD)</th>
+                  <th>独立用户数</th>
+                </tr>
+              </thead>
+              <tbody id="statsRows">
+                <tr><td class="empty" colspan="6">连接数据库后查询日志统计</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="../tauri-bridge.js"></script>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

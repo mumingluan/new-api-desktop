@@ -1,25 +1,34 @@
 {
   "name": "new-api-desktop",
   "version": "1.1.3",
-  "description": "New API - AI Model Gateway Desktop Application",
-  "main": "main.js",
+  "description": "New API cross-platform desktop and mobile client built with Tauri",
+  "type": "commonjs",
   "scripts": {
-    "start-app": "electron .",
-    "dev-app": "cross-env NODE_ENV=development electron .",
-    "build:classic": "cd web && bun install --frozen-lockfile && bun run --cwd classic build",
-    "build:frontends": "npm run build:classic",
-    "test": "node --test frontend-storage.test.js key-query-store.test.js key-query-service.test.js key-query-ui.test.js user-data-migration.test.js key-batch-store.test.js key-batch-service.test.js key-batch-ui.test.js",
-    "build": "electron-builder",
-    "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
-    "build:linux": "electron-builder --linux"
+    "tauri": "tauri",
+    "prepare:tauri-assets": "node scripts/prepare-tauri-assets.js",
+    "dev": "npm run prepare:tauri-assets && tauri dev",
+    "build": "npm run prepare:tauri-assets && tauri build",
+    "build:win": "scripts\\build-windows.cmd",
+    "build:mac": "npm run prepare:tauri-assets && tauri build --bundles dmg",
+    "build:linux": "npm run prepare:tauri-assets && tauri build --bundles appimage,deb",
+    "android:init": "tauri android init",
+    "android:dev": "npm run prepare:tauri-assets && tauri android dev",
+    "android:build": "scripts\\build-android.cmd",
+    "android:build:release": "node scripts/configure-android.js && npm run prepare:tauri-assets && tauri android build --apk",
+    "ios:init": "tauri ios init",
+    "ios:dev": "tauri ios dev",
+    "ios:build": "tauri ios build",
+    "test": "node --test frontend-storage.test.js key-query-store.test.js key-query-service.test.js key-query-ui.test.js user-data-migration.test.js key-batch-store.test.js key-batch-service.test.js key-batch-ui.test.js scripts/prepare-tauri-assets.test.js",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "build:classic": "cd web && bun install --frozen-lockfile && bun run --cwd classic build"
   },
   "keywords": [
     "ai",
     "api",
     "gateway",
-    "openai",
-    "claude"
+    "tauri",
+    "android"
   ],
   "author": "QuantumNous",
   "contributors": [
@@ -29,174 +38,14 @@
     "type": "git",
     "url": "https://github.com/mumingluan/new-api-desktop"
   },
-  "devDependencies": {
-    "cross-env": "^7.0.3",
-    "electron": "39.8.5",
-    "electron-builder": "^26.7.0"
-  },
-  "build": {
-    "appId": "com.newapi.desktop",
-    "productName": "New-API-Desktop",
-    "copyright": "Copyright © 2026 QuantumNous; New-API-Desktop maintained by MUML",
-    "publish": null,
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "main.js",
-      "preload.js",
-      "frontend-storage.js",
-      "user-data-migration.js",
-      "key-query-store.js",
-      "key-query-service.js",
-      "key-query/**/*",
-      "key-batch/**/*",
-      "key-batch-service.js",
-      "key-batch-store.js",
-      "desktop/**/*",
-      "icon.png",
-      "tray-iconTemplate.png",
-      "tray-iconTemplate@2x.png",
-      "tray-icon-windows.png"
-    ],
-    "mac": {
-      "category": "public.app-category.developer-tools",
-      "icon": "icon.png",
-      "identity": null,
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false,
-      "entitlements": "entitlements.mac.plist",
-      "entitlementsInherit": "entitlements.mac.plist",
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "extraResources": [
-        {
-          "from": "web/default/dist",
-          "to": "web/default/dist"
-        },
-        {
-          "from": "web/xuancat/dist",
-          "to": "web/xuancat/dist"
-        },
-        {
-          "from": "web/classic/dist",
-          "to": "web/classic/dist"
-        },
-        {
-          "from": "LICENSE",
-          "to": "licenses/LICENSE"
-        },
-        {
-          "from": "NOTICE",
-          "to": "licenses/NOTICE"
-        },
-        {
-          "from": "THIRD-PARTY-LICENSES.md",
-          "to": "licenses/THIRD-PARTY-LICENSES.md"
-        },
-        {
-          "from": "node_modules/electron/dist/LICENSE",
-          "to": "licenses/electron/LICENSE"
-        },
-        {
-          "from": "node_modules/electron/dist/LICENSES.chromium.html",
-          "to": "licenses/electron/LICENSES.chromium.html"
-        }
-      ]
-    },
-    "win": {
-      "icon": "icon.png",
-      "legalTrademarks": "New-API-Desktop maintained by MUML",
-      "target": [
-        "nsis",
-        "portable"
-      ],
-      "extraResources": [
-        {
-          "from": "web/default/dist",
-          "to": "web/default/dist"
-        },
-        {
-          "from": "web/xuancat/dist",
-          "to": "web/xuancat/dist"
-        },
-        {
-          "from": "web/classic/dist",
-          "to": "web/classic/dist"
-        },
-        {
-          "from": "LICENSE",
-          "to": "licenses/LICENSE"
-        },
-        {
-          "from": "NOTICE",
-          "to": "licenses/NOTICE"
-        },
-        {
-          "from": "THIRD-PARTY-LICENSES.md",
-          "to": "licenses/THIRD-PARTY-LICENSES.md"
-        },
-        {
-          "from": "node_modules/electron/dist/LICENSE",
-          "to": "licenses/electron/LICENSE"
-        },
-        {
-          "from": "node_modules/electron/dist/LICENSES.chromium.html",
-          "to": "licenses/electron/LICENSES.chromium.html"
-        }
-      ]
-    },
-    "linux": {
-      "icon": "icon.png",
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "category": "Development",
-      "extraResources": [
-        {
-          "from": "web/default/dist",
-          "to": "web/default/dist"
-        },
-        {
-          "from": "web/xuancat/dist",
-          "to": "web/xuancat/dist"
-        },
-        {
-          "from": "web/classic/dist",
-          "to": "web/classic/dist"
-        },
-        {
-          "from": "LICENSE",
-          "to": "licenses/LICENSE"
-        },
-        {
-          "from": "NOTICE",
-          "to": "licenses/NOTICE"
-        },
-        {
-          "from": "THIRD-PARTY-LICENSES.md",
-          "to": "licenses/THIRD-PARTY-LICENSES.md"
-        },
-        {
-          "from": "node_modules/electron/dist/LICENSE",
-          "to": "licenses/electron/LICENSE"
-        },
-        {
-          "from": "node_modules/electron/dist/LICENSES.chromium.html",
-          "to": "licenses/electron/LICENSES.chromium.html"
-        }
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    }
-  },
   "dependencies": {
-    "electron-updater": "^6.8.9",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-opener": "^2.5.4",
+    "@tauri-apps/plugin-updater": "^2.10.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
     "mysql2": "^3.23.2"
   }
 }

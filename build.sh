@@ -4,53 +4,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-echo "New-API-Desktop build"
+echo "New API Desktop - Tauri build"
 echo
-echo "Before continuing, build the latest frontend in the new-api repository:"
-echo "  cd /path/to/new-api/web"
-echo "  bun install --frozen-lockfile"
-echo "  VITE_LANDING_PAGE_VARIANT=xuancat bun run build"
-echo "  VITE_LANDING_PAGE_VARIANT=default bun run build"
-echo
-echo "Then copy both build outputs:"
-echo "  web/xuancat/dist  <-  Xuancat build"
-echo "  web/default/dist  <-  Default build"
-echo
-read -r -p "Has the latest frontend been copied? [y/N] " confirmed
-case "${confirmed}" in
-  y|Y|yes|YES) ;;
-  *)
-    echo "Build cancelled."
-    exit 0
-    ;;
-esac
-
-if [[ ! -f "web/default/dist/index.html" ]]; then
-  echo "Error: web/default/dist/index.html was not found."
-  echo "Build and copy the latest new-api frontend first."
-  exit 1
-fi
-if [[ ! -f "web/xuancat/dist/index.html" ]]; then
-  echo "Error: web/xuancat/dist/index.html was not found."
-  echo "Build and copy the Xuancat frontend first."
-  exit 1
-fi
-
-echo
-echo "[1/3] Installing desktop dependencies..."
+echo "[1/2] Installing locked dependencies..."
 npm ci
 
 echo
-echo "[2/3] Building the Classic frontend..."
-npm run build:classic
-
-if [[ ! -f "web/classic/dist/index.html" ]]; then
-  echo "Error: Classic frontend build output was not created."
-  exit 1
-fi
-
-echo
-echo "[3/3] Packaging New-API-Desktop..."
+echo "[2/2] Packaging the Tauri application..."
 case "${OSTYPE:-}" in
   darwin*) npm run build:mac ;;
   linux-gnu*) npm run build:linux ;;
@@ -59,4 +19,4 @@ case "${OSTYPE:-}" in
 esac
 
 echo
-echo "Build complete. Artifacts are in dist/."
+echo "Build complete. Artifacts are in src-tauri/target/release/bundle/."

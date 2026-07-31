@@ -3,6 +3,7 @@ web/node_modules/
 dist*
 
 web/default/dist/
+web/xuancat/dist/
 web/classic/dist/
 
 *.log

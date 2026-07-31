@@ -11,6 +11,12 @@ Desktop packaging and maintenance: **MUML**. The underlying New API project attr
 - 配置任意 New API 后端地址。
 - 管理多个后端实例。
 - 从托盘菜单为任意实例启动新版前端或经典前端。
+- 启动新版前端时探测后端 `/457`：仅当响应严格包含 `"457": true` 时加载
+  `web/xuancat/dist`，其余情况加载 `web/default/dist`；经典前端不参与探测。
+- 托盘提供独立“密钥查询”窗口，可查询任意兼容服务器的额度、有效期和调用记录，
+  并保存独立于桌面后端列表的常用服务器—密钥组合。
+- “密钥查询”下方提供“密钥批量操作”，支持按 MySQL Token 分组批量增减额度、
+  延长/扣除有效期，以及按日期、模型、用户等条件汇总并导出日志统计。
 - 支持同一实例打开多个窗口，也支持多个实例同时打开。
 - 支持交互式登录和 Access token 登录。
 - 已保存的 Access token 不会在设置界面明文显示；验证和保存时可继续复用。
@@ -29,6 +35,9 @@ preload.js                安全 IPC bridge
 desktop/                  桌面端设置页面
 web/classic/              经典前端源码
 web/default/dist/         外部准备的新版前端构建产物
+web/xuancat/dist/         外部准备的 Xuancat 前端构建产物
+key-query/                独立密钥查询窗口
+key-batch/                密钥批量操作与日志统计窗口
 package.json              Electron 脚本与 electron-builder 配置
 dist/                     构建输出目录，已被 git 忽略
 ```
@@ -41,16 +50,18 @@ dist/                     构建输出目录，已被 git 忽略
 npm run build:classic
 ```
 
-新版前端源码继续由 `mumingluan/new-api` 的 `web/` 目录维护。构建新版前端后，将产物复制到：
+新版前端源码继续由 `mumingluan/new-api` 的 `web/` 目录维护。分别构建两个版本并复制到：
 
 ```text
-web/default/dist
+web/default/dist   <- VITE_LANDING_PAGE_VARIANT=default
+web/xuancat/dist   <- VITE_LANDING_PAGE_VARIANT=xuancat
 ```
 
 打包前应同时存在：
 
 ```text
 web/default/dist
+web/xuancat/dist
 web/classic/dist
 ```
 
@@ -103,8 +114,8 @@ dist
 Windows 构建产物包括：
 
 ```text
-dist/New-API-Desktop Setup 1.0.0.exe
-dist/New-API-Desktop 1.0.0.exe
+dist/New-API-Desktop Setup 1.1.3.exe
+dist/New-API-Desktop 1.1.3.exe
 dist/win-unpacked/
 ```
 
@@ -119,7 +130,7 @@ desktop-config.json
 Windows 常见路径：
 
 ```text
-%APPDATA%/new-api-electron/desktop-config.json
+%APPDATA%/new-api-desktop/desktop-config.json
 ```
 
 主要字段：
@@ -155,6 +166,12 @@ This is the Electron desktop shell for New API. It does not start or bundle a Go
 - Connect to any New API backend URL.
 - Manage multiple backend instances.
 - Launch the default frontend or classic frontend for any instance from the tray menu.
+- Probe `/457` before launching the new frontend. A strict `"457": true` response selects
+  `web/xuancat/dist`; all other results select `web/default/dist`. Classic is unchanged.
+- Open the independent Key Query window from the tray, query any compatible server, and
+  save server-key profiles separately from the managed desktop backends.
+- Open Key Batch Operations directly below Key Query to update token quota/expiry by MySQL
+  group and aggregate or export log statistics by date, model, and user filters.
 - Open multiple windows for the same instance or for different instances.
 - Support interactive login and Access token login.
 - Reuse saved Access tokens without displaying them in the settings UI.
@@ -173,6 +190,9 @@ preload.js                Safe IPC bridge
 desktop/                  Desktop settings UI
 web/classic/              Classic frontend source
 web/default/dist/         Externally prepared default frontend build
+web/xuancat/dist/         Externally prepared Xuancat frontend build
+key-query/                Independent key-query window
+key-batch/                Token batch operations and log-statistics window
 package.json              Electron scripts and electron-builder config
 dist/                     Generated build output, ignored by git
 ```
@@ -185,16 +205,18 @@ The Classic frontend source is maintained in this repository and can be built di
 npm run build:classic
 ```
 
-The default frontend source remains in the `web/` directory of `mumingluan/new-api`. Build it there and copy its output to:
+The frontend source remains in the `web/` directory of `mumingluan/new-api`. Build both variants and copy their outputs to:
 
 ```text
-web/default/dist
+web/default/dist   <- VITE_LANDING_PAGE_VARIANT=default
+web/xuancat/dist   <- VITE_LANDING_PAGE_VARIANT=xuancat
 ```
 
 Before packaging, both build outputs must exist:
 
 ```text
 web/default/dist
+web/xuancat/dist
 web/classic/dist
 ```
 
@@ -245,8 +267,8 @@ dist
 Windows outputs include:
 
 ```text
-dist/New-API-Desktop Setup 1.0.0.exe
-dist/New-API-Desktop 1.0.0.exe
+dist/New-API-Desktop Setup 1.1.3.exe
+dist/New-API-Desktop 1.1.3.exe
 dist/win-unpacked/
 ```
 
@@ -261,7 +283,7 @@ desktop-config.json
 Typical Windows path:
 
 ```text
-%APPDATA%/new-api-electron/desktop-config.json
+%APPDATA%/new-api-desktop/desktop-config.json
 ```
 
 Key fields:

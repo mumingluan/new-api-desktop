@@ -517,11 +517,6 @@ const LoginForm = () => {
                 {t('登 录')}
               </Title>
             </div>
-            <div className='px-6 pb-0 text-center'>
-              <Text size='small' className='text-gray-500'>
-                {t('控制台登录仅供管理员使用，用户无需登录。请前往')}<Link to='/' className='text-blue-600 hover:text-blue-800'>{t('首页')}</Link>{t('查看教程。')}
-              </Text>
-            </div>
             <div className='px-2 py-8'>
               <div className='space-y-3'>
                 {status.wechat_login && (
@@ -735,11 +730,6 @@ const LoginForm = () => {
               <Title heading={3} className='text-gray-800 dark:text-gray-200'>
                 {t('登 录')}
               </Title>
-            </div>
-            <div className='px-6 pb-0 text-center'>
-              <Text size='small' className='text-gray-500'>
-                {t('控制台登录仅供管理员使用，用户无需登录。请前往')}<Link to='/' className='text-blue-600 hover:text-blue-800'>{t('首页')}</Link>{t('查看教程。')}
-              </Text>
             </div>
             <div className='px-2 py-8'>
               {status.passkey_login && passkeySupported && (

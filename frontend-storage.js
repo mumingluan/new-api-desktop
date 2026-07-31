@@ -22,11 +22,13 @@ class FrontendStorageStore {
   }
 
   get(instanceId, flavor) {
-    return { ...(this.data.instances[instanceId]?.[flavor] || {}) }
+    const storageFlavor = flavor === 'xuancat' ? 'default' : flavor
+    return { ...(this.data.instances[instanceId]?.[storageFlavor] || {}) }
   }
 
   replace(instanceId, flavor, snapshot) {
-    if (!instanceId || !['default', 'classic'].includes(flavor)) return
+    const storageFlavor = flavor === 'xuancat' ? 'default' : flavor
+    if (!instanceId || !['default', 'classic'].includes(storageFlavor)) return
     const normalized = {}
     if (snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot)) {
       for (const [key, value] of Object.entries(snapshot)) {
@@ -34,7 +36,7 @@ class FrontendStorageStore {
       }
     }
     if (!this.data.instances[instanceId]) this.data.instances[instanceId] = {}
-    this.data.instances[instanceId][flavor] = normalized
+    this.data.instances[instanceId][storageFlavor] = normalized
     this.scheduleSave()
   }
 

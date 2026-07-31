@@ -9,10 +9,12 @@ echo
 echo "Before continuing, build the latest frontend in the new-api repository:"
 echo "  cd /path/to/new-api/web"
 echo "  bun install --frozen-lockfile"
-echo "  bun run build"
+echo "  VITE_LANDING_PAGE_VARIANT=xuancat bun run build"
+echo "  VITE_LANDING_PAGE_VARIANT=default bun run build"
 echo
-echo "Then replace this directory with the new build output:"
-echo "  web/default/dist  <-  /path/to/new-api/web/dist"
+echo "Then copy both build outputs:"
+echo "  web/xuancat/dist  <-  Xuancat build"
+echo "  web/default/dist  <-  Default build"
 echo
 read -r -p "Has the latest frontend been copied? [y/N] " confirmed
 case "${confirmed}" in
@@ -26,6 +28,11 @@ esac
 if [[ ! -f "web/default/dist/index.html" ]]; then
   echo "Error: web/default/dist/index.html was not found."
   echo "Build and copy the latest new-api frontend first."
+  exit 1
+fi
+if [[ ! -f "web/xuancat/dist/index.html" ]]; then
+  echo "Error: web/xuancat/dist/index.html was not found."
+  echo "Build and copy the Xuancat frontend first."
   exit 1
 fi
 

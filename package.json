@@ -1,6 +1,6 @@
 {
-  "name": "new-api-electron",
-  "version": "1.0.2",
+  "name": "new-api-desktop",
+  "version": "1.1.3",
   "description": "New API - AI Model Gateway Desktop Application",
   "main": "main.js",
   "scripts": {
@@ -8,6 +8,7 @@
     "dev-app": "cross-env NODE_ENV=development electron .",
     "build:classic": "cd web && bun install --frozen-lockfile && bun run --cwd classic build",
     "build:frontends": "npm run build:classic",
+    "test": "node --test frontend-storage.test.js key-query-store.test.js key-query-service.test.js key-query-ui.test.js user-data-migration.test.js key-batch-store.test.js key-batch-service.test.js key-batch-ui.test.js",
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win",
@@ -45,6 +46,13 @@
       "main.js",
       "preload.js",
       "frontend-storage.js",
+      "user-data-migration.js",
+      "key-query-store.js",
+      "key-query-service.js",
+      "key-query/**/*",
+      "key-batch/**/*",
+      "key-batch-service.js",
+      "key-batch-store.js",
       "desktop/**/*",
       "icon.png",
       "tray-iconTemplate.png",
@@ -67,6 +75,10 @@
         {
           "from": "web/default/dist",
           "to": "web/default/dist"
+        },
+        {
+          "from": "web/xuancat/dist",
+          "to": "web/xuancat/dist"
         },
         {
           "from": "web/classic/dist",
@@ -107,6 +119,10 @@
           "to": "web/default/dist"
         },
         {
+          "from": "web/xuancat/dist",
+          "to": "web/xuancat/dist"
+        },
+        {
           "from": "web/classic/dist",
           "to": "web/classic/dist"
         },
@@ -145,6 +161,10 @@
           "to": "web/default/dist"
         },
         {
+          "from": "web/xuancat/dist",
+          "to": "web/xuancat/dist"
+        },
+        {
           "from": "web/classic/dist",
           "to": "web/classic/dist"
         },
@@ -176,6 +196,7 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "mysql2": "^3.23.2"
   }
 }

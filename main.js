@@ -15,9 +15,16 @@ const https = require('https')
 const path = require('path')
 const { URL } = require('url')
 const { FrontendStorageStore } = require('./frontend-storage')
+const { queryToken } = require('./key-query-service')
+const { KeyQueryProfileStore } = require('./key-query-store')
+const { KeyBatchService } = require('./key-batch-service')
+const { KeyBatchProfileStore } = require('./key-batch-store')
+const { migrateLegacyUserData } = require('./user-data-migration')
 
 let mainWindow
 let settingsWindow
+let keyQueryWindow
+let keyBatchWindow
 let tray
 let desktopServer
 let desktopServerPort = 0
@@ -27,13 +34,16 @@ let lastStatus = { ok: false, message: 'Not checked', checkedAt: null }
 let restoringWindows = false
 let openWindowsSaveTimer = null
 let frontendStorageStore
+let keyQueryProfileStore
+let keyBatchProfileStore
+let keyBatchService
 
 const appServers = new Map()
 const appWindows = new Set()
 const cookieJars = new Map()
 const preferredDesktopPort = Number(process.env.NEW_API_DESKTOP_PORT || 32176)
 const supportedLanguages = ['en', 'zh', 'fr', 'ja', 'ru', 'vi']
-const proxyPrefixes = ['/api', '/mj', '/pg', '/v1', '/v1beta', '/dashboard', '/swagger']
+const proxyPrefixes = ['/457', '/api', '/mj', '/pg', '/v1', '/v1beta', '/dashboard', '/swagger']
 
 const messages = {
   en: {
@@ -47,6 +57,8 @@ const messages = {
     'No backend configured': 'No backend configured',
     'Launch Default Frontend': 'Launch Default Frontend',
     'Launch Classic Frontend': 'Launch Classic Frontend',
+    'Key Query': 'Key Query',
+    'Key Batch Operations': 'Key Batch Operations',
   },
   zh: {
     Backend: '后端',
@@ -59,6 +71,8 @@ const messages = {
     'No backend configured': '未配置后端',
     'Launch Default Frontend': '启动 新版前端',
     'Launch Classic Frontend': '启动 经典前端',
+    'Key Query': '密钥查询',
+    'Key Batch Operations': '密钥批量操作',
   },
   fr: {
     Backend: 'Backend',
@@ -71,6 +85,8 @@ const messages = {
     'No backend configured': 'Aucun backend configure',
     'Launch Default Frontend': 'Lancer le frontend par defaut',
     'Launch Classic Frontend': 'Lancer le frontend classique',
+    'Key Query': 'Requete de cle',
+    'Key Batch Operations': 'Operations de cles en lot',
   },
   ja: {
     Backend: 'バックエンド',
@@ -83,6 +99,8 @@ const messages = {
     'No backend configured': 'バックエンド未設定',
     'Launch Default Frontend': 'デフォルトフロントエンドを起動',
     'Launch Classic Frontend': 'クラシックフロントエンドを起動',
+    'Key Query': 'キー照会',
+    'Key Batch Operations': 'キー一括操作',
   },
   ru: {
     Backend: 'Backend',
@@ -95,6 +113,8 @@ const messages = {
     'No backend configured': 'Backend не настроен',
     'Launch Default Frontend': 'Запустить frontend по умолчанию',
     'Launch Classic Frontend': 'Запустить классический frontend',
+    'Key Query': 'Проверка ключа',
+    'Key Batch Operations': 'Пакетные операции с ключами',
   },
   vi: {
     Backend: 'Backend',
@@ -107,6 +127,8 @@ const messages = {
     'No backend configured': 'Chua cau hinh backend',
     'Launch Default Frontend': 'Mo frontend mac dinh',
     'Launch Classic Frontend': 'Mo frontend co dien',
+    'Key Query': 'Tra cuu khoa',
+    'Key Batch Operations': 'Thao tac khoa hang loat',
   },
 }
 
@@ -175,6 +197,13 @@ function loadConfig() {
   frontendStorageStore = new FrontendStorageStore(
     path.join(app.getPath('userData'), 'frontend-storage.json'),
   )
+  keyQueryProfileStore = new KeyQueryProfileStore(
+    path.join(app.getPath('userData'), 'key-query-profiles.json'),
+  )
+  keyBatchProfileStore = new KeyBatchProfileStore(
+    path.join(app.getPath('userData'), 'key-batch-profiles.json'),
+  )
+  keyBatchService = new KeyBatchService()
   try {
     if (!fs.existsSync(configPath)) return
     const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'))
@@ -248,7 +277,7 @@ function broadcastConfig() {
 
 function getFrontendDist(flavor) {
   if (app.isPackaged) return path.join(process.resourcesPath, 'web', flavor, 'dist')
-  return path.join(__dirname, '..', 'web', flavor, 'dist')
+  return path.join(__dirname, 'web', flavor, 'dist')
 }
 
 function getDesktopRoot() {
@@ -340,15 +369,12 @@ function serializeForInlineScript(value) {
 
 function injectDesktopBootstrap(html, context) {
   const instance = context?.instance || getActiveInstance()
-  const flavor = context?.flavor || 'default'
+  const flavor = context?.assetFlavor || context?.flavor || 'default'
+  const storageFlavor = context?.flavor || 'default'
   const frontendStorage =
-    context && instance && frontendStorageStore ? frontendStorageStore.get(instance.id, flavor) : null
-  const bootstrap = {
-    desktop: true,
-    backend: instance ? { id: instance.id, baseUrl: instance.baseUrl, authMode: instance.authMode } : null,
-    flavor,
-    language: resolveLanguage(config.desktopLanguage),
-  }
+    context && instance && frontendStorageStore
+      ? frontendStorageStore.get(instance.id, storageFlavor)
+      : null
   const user =
     instance && instance.authMode === 'accessToken' && instance.userId
       ? instance.user || {
@@ -359,6 +385,13 @@ function injectDesktopBootstrap(html, context) {
           status: 1,
         }
       : null
+  const bootstrap = {
+    desktop: true,
+    backend: instance ? { id: instance.id, baseUrl: instance.baseUrl, authMode: instance.authMode } : null,
+    flavor,
+    language: resolveLanguage(config.desktopLanguage),
+    user,
+  }
   const script = `<script>
 window.__NEW_API_DESKTOP__=${serializeForInlineScript(bootstrap)};
 try {
@@ -553,15 +586,32 @@ function proxyRequest(req, res, context = {}) {
   req.pipe(proxyReq)
 }
 
-function createAppServerContext(instanceId, flavor) {
+async function createAppServerContext(instanceId, flavor) {
   const instance = config.instances.find((item) => item.id === instanceId) || getActiveInstance()
   if (!instance) throw new Error('No backend instance is configured.')
   const selectedFlavor = flavor === 'classic' ? 'classic' : 'default'
+  let assetFlavor = selectedFlavor
+  if (selectedFlavor === 'default') {
+    try {
+      const marker = await requestBackend(instance, '/457', { timeout: 5000 })
+      if (
+        marker.statusCode >= 200 &&
+        marker.statusCode < 300 &&
+        marker.data &&
+        marker.data['457'] === true
+      ) {
+        assetFlavor = 'xuancat'
+      }
+    } catch (err) {
+      console.warn(`Xuancat frontend probe failed for ${instance.baseUrl}:`, err.message)
+    }
+  }
   return {
     id: createId(),
     instance,
     flavor: selectedFlavor,
-    frontendRoot: getFrontendDist(selectedFlavor),
+    assetFlavor,
+    frontendRoot: getFrontendDist(assetFlavor),
     server: null,
     port: 0,
   }
@@ -717,12 +767,13 @@ function installEditContextMenu(win) {
 function setBusinessWindowTitle(win) {
   if (!win || win.isDestroyed() || !win.__newApiContext) return
   const context = win.__newApiContext
-  const flavorTitle = context.flavor === 'classic' ? 'Classic' : 'Default'
+  const flavorTitle =
+    context.flavor === 'classic' ? 'Classic' : context.assetFlavor === 'xuancat' ? 'Xuancat' : 'Default'
   win.setTitle(`New API Desktop - ${flavorTitle} - ${context.instance.name}`)
 }
 
 async function createWindow(options = {}) {
-  const context = createAppServerContext(options.instanceId, options.flavor || 'default')
+  const context = await createAppServerContext(options.instanceId, options.flavor || 'default')
   await startAppServer(context)
   const win = new BrowserWindow({
     width: options.bounds?.width || 1320,
@@ -809,6 +860,67 @@ function createSettingsWindow() {
   })
 }
 
+function createKeyQueryWindow() {
+  if (keyQueryWindow && !keyQueryWindow.isDestroyed()) {
+    keyQueryWindow.show()
+    keyQueryWindow.focus()
+    return
+  }
+  keyQueryWindow = new BrowserWindow({
+    width: 1320,
+    height: 820,
+    minWidth: 800,
+    minHeight: 600,
+    title: 'New API Desktop - 密钥查询',
+    icon: path.join(__dirname, 'icon.png'),
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  })
+  keyQueryWindow.setMenuBarVisibility(false)
+  installWindowShortcuts(keyQueryWindow)
+  installEditContextMenu(keyQueryWindow)
+  keyQueryWindow.loadFile(path.join(__dirname, 'key-query', 'index.html'))
+  keyQueryWindow.on('closed', () => {
+    keyQueryWindow = null
+  })
+}
+
+function createKeyBatchWindow() {
+  if (keyBatchWindow && !keyBatchWindow.isDestroyed()) {
+    keyBatchWindow.show()
+    keyBatchWindow.focus()
+    return
+  }
+  keyBatchWindow = new BrowserWindow({
+    width: 1320,
+    height: 880,
+    minWidth: 860,
+    minHeight: 640,
+    title: 'New API Desktop - 密钥批量操作',
+    icon: path.join(__dirname, 'icon.png'),
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  })
+  keyBatchWindow.setMenuBarVisibility(false)
+  installWindowShortcuts(keyBatchWindow)
+  installEditContextMenu(keyBatchWindow)
+  keyBatchWindow.loadFile(path.join(__dirname, 'key-batch', 'index.html'))
+  keyBatchWindow.on('closed', () => {
+    keyBatchWindow = null
+    keyBatchService?.close().catch(() => {})
+  })
+}
+
 function showMainWindow() {
   const windows = Array.from(appWindows).filter((win) => !win.isDestroyed())
   if (windows.length === 0) {
@@ -846,6 +958,8 @@ function updateTrayMenu() {
       { type: 'separator' },
       { label: t('Launch Default Frontend'), enabled: hasInstances, submenu: launchItems('default') },
       { label: t('Launch Classic Frontend'), enabled: hasInstances, submenu: launchItems('classic') },
+      { label: t('Key Query'), click: createKeyQueryWindow },
+      { label: t('Key Batch Operations'), click: createKeyBatchWindow },
       { type: 'separator' },
       {
         label: t('Quit'),
@@ -1011,6 +1125,36 @@ function setupIpc() {
     frontendStorageStore.replace(context.instance.id, context.flavor, snapshot)
     return true
   })
+  ipcMain.handle('desktop:get-key-query-profiles', () => keyQueryProfileStore?.list() || [])
+  ipcMain.handle('desktop:save-key-query-profile', (_event, profile) => keyQueryProfileStore.save(profile))
+  ipcMain.handle('desktop:delete-key-query-profile', (_event, id) => keyQueryProfileStore.delete(id))
+  ipcMain.handle('desktop:query-token', (_event, input) => queryToken(input))
+  ipcMain.handle('desktop:get-key-batch-profiles', () => keyBatchProfileStore?.list() || [])
+  ipcMain.handle('desktop:save-key-batch-profile', (_event, profile) => keyBatchProfileStore.save(profile))
+  ipcMain.handle('desktop:delete-key-batch-profile', (_event, id) => keyBatchProfileStore.delete(id))
+  ipcMain.handle('desktop:connect-key-batch-database', (_event, input) => keyBatchService.connect(input))
+  ipcMain.handle('desktop:get-key-batch-groups', () => keyBatchService.loadGroups())
+  ipcMain.handle('desktop:count-key-batch-group', (_event, group) => keyBatchService.countGroup(group))
+  ipcMain.handle('desktop:execute-key-batch-operation', (_event, input) => keyBatchService.executeBatch(input))
+  ipcMain.handle('desktop:query-key-batch-stats', (_event, input) => keyBatchService.queryStats(input))
+  ipcMain.handle('desktop:export-key-query-csv', async (_event, content) => {
+    const { canceled, filePath } = await dialog.showSaveDialog(keyQueryWindow, {
+      defaultPath: `new-api-key-logs-${new Date().toISOString().slice(0, 10)}.csv`,
+      filters: [{ name: 'CSV', extensions: ['csv'] }],
+    })
+    if (canceled || !filePath) return false
+    fs.writeFileSync(filePath, String(content || ''), 'utf8')
+    return true
+  })
+  ipcMain.handle('desktop:export-key-batch-csv', async (_event, content) => {
+    const { canceled, filePath } = await dialog.showSaveDialog(keyBatchWindow, {
+      defaultPath: `new-api-log-stats-${new Date().toISOString().slice(0, 10)}.csv`,
+      filters: [{ name: 'CSV', extensions: ['csv'] }],
+    })
+    if (canceled || !filePath) return false
+    fs.writeFileSync(filePath, String(content || ''), 'utf8')
+    return true
+  })
   ipcMain.handle('desktop:check-for-updates', () => checkForUpdates())
 }
 
@@ -1031,6 +1175,7 @@ async function checkForUpdates() {
 }
 
 app.whenReady().then(async () => {
+  migrateLegacyUserData(app.getPath('appData'), app.getPath('userData'))
   loadConfig()
   setupIpc()
   Menu.setApplicationMenu(null)

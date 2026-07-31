@@ -82,3 +82,30 @@ test('stores only string localStorage values', (t) => {
 
   assert.deepEqual(fixture.store.get('backend-a', 'default'), { valid: 'value' })
 })
+
+test('shares login state between the auto-selected Xuancat asset and the default frontend', (t) => {
+  const fixture = createStore()
+  t.after(() => {
+    fixture.store.flush()
+    fs.rmSync(fixture.directory, { recursive: true, force: true })
+  })
+
+  fixture.store.replace('backend-a', 'default', {
+    user: '{"id":1,"username":"xuancat"}',
+    uid: '1',
+  })
+
+  assert.deepEqual(fixture.store.get('backend-a', 'xuancat'), {
+    user: '{"id":1,"username":"xuancat"}',
+    uid: '1',
+  })
+
+  fixture.store.replace('backend-a', 'xuancat', {
+    user: '{"id":2,"username":"updated"}',
+    uid: '2',
+  })
+  assert.deepEqual(fixture.store.get('backend-a', 'default'), {
+    user: '{"id":2,"username":"updated"}',
+    uid: '2',
+  })
+})

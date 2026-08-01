@@ -33,6 +33,14 @@ const insetIconPath = path.join(
   'drawable',
   'ic_launcher_foreground_inset.xml',
 )
+const iconColorsPath = path.join(
+  appRoot,
+  'src',
+  'main',
+  'res',
+  'values',
+  'ic_launcher_colors.xml',
+)
 
 if (!fs.existsSync(propertiesPath)) {
   throw new Error('Android project is not initialized. Run `npm run android:init` first.')
@@ -165,6 +173,12 @@ writeIfChanged(insetIconPath, `<?xml version="1.0" encoding="utf-8"?>
     android:insetTop="8dp"
     android:insetRight="8dp"
     android:insetBottom="8dp" />
+`)
+
+writeIfChanged(iconColorsPath, `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <color name="ic_launcher_background">#FFFFFF</color>
+</resources>
 `)
 
 console.log('Configured Android Gradle, system insets, and adaptive icon assets.')

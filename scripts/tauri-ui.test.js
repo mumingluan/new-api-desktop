@@ -26,6 +26,7 @@ test('Android release permits the loopback proxy and avoids system cutouts', () 
   assert.match(configureScript, /view\.setPadding\(/)
   assert.match(configureScript, /@drawable\/ic_launcher_foreground_inset/)
   assert.match(configureScript, /android:insetLeft=\"8dp\"/)
+  assert.match(configureScript, /<color name=\"ic_launcher_background\">#FFFFFF<\/color>/)
   assert.match(buildScript, /apksigner\.bat/)
   assert.match(buildScript, /New-API-Desktop_1\.1\.4_arm64-release\.apk/)
 

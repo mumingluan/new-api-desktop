@@ -1,6 +1,7 @@
-use std::{io::Write, sync::Arc, time::Duration};
+use std::{collections::HashSet, io::Write, sync::Arc, time::Duration};
 
 use chrono::{Datelike, Duration as ChronoDuration, Local, SecondsFormat, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::{
     mysql::{MySqlConnectOptions, MySqlPoolOptions, MySqlSslMode},
@@ -26,6 +27,53 @@ use crate::{
 
 const QUOTA_PER_USD: f64 = 500_000.0;
 const LANGUAGES: &[&str] = &["auto", "en", "zh", "fr", "ja", "ru", "vi"];
+const CONFIG_TRANSFER_FORMAT: &str = "new-api-desktop-settings";
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BackendTransfer {
+    #[serde(default)]
+    instances: Vec<Instance>,
+    #[serde(default)]
+    active_instance_id: String,
+    #[serde(default = "default_transfer_flavor")]
+    active_flavor: String,
+}
+
+fn default_transfer_flavor() -> String {
+    "default".into()
+}
+
+fn selected_section(sections: &[String], name: &str) -> bool {
+    sections.iter().any(|section| section == name)
+}
+
+fn validate_transfer_sections(sections: &[String]) -> Result<(), String> {
+    if sections.is_empty() {
+        return Err("请至少选择一项配置".into());
+    }
+    if sections.iter().any(|section| {
+        !matches!(
+            section.as_str(),
+            "backends" | "keyQueryProfiles" | "databaseProfiles"
+        )
+    }) {
+        return Err("包含未知的配置部分".into());
+    }
+    Ok(())
+}
+
+fn ensure_unique_id(id: &mut String, ids: &mut HashSet<String>) {
+    if id.is_empty() || !ids.insert(id.clone()) {
+        loop {
+            let candidate = Uuid::new_v4().to_string();
+            if ids.insert(candidate.clone()) {
+                *id = candidate;
+                break;
+            }
+        }
+    }
+}
 
 fn command_error(error: impl std::fmt::Display) -> String {
     error.to_string()
@@ -1148,6 +1196,204 @@ pub async fn export_csv(app: AppHandle, content: String, kind: String) -> Result
     let mut file = app.fs().open(path, options).map_err(command_error)?;
     file.write_all(content.as_bytes()).map_err(command_error)?;
     file.flush().map_err(command_error)?;
+    Ok(true)
+}
+
+#[tauri::command]
+pub async fn export_configuration(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    sections: Vec<String>,
+) -> Result<bool, String> {
+    validate_transfer_sections(&sections)?;
+    let mut exported = serde_json::Map::new();
+    if selected_section(&sections, "backends") {
+        let config = state.config.read().await;
+        exported.insert(
+            "backends".into(),
+            serde_json::to_value(BackendTransfer {
+                instances: config.instances.clone(),
+                active_instance_id: config.active_instance_id.clone(),
+                active_flavor: config.active_flavor.clone(),
+            })
+            .map_err(command_error)?,
+        );
+    }
+    if selected_section(&sections, "keyQueryProfiles") {
+        exported.insert(
+            "keyQueryProfiles".into(),
+            serde_json::to_value(state.key_query_profiles.read().await.clone())
+                .map_err(command_error)?,
+        );
+    }
+    if selected_section(&sections, "databaseProfiles") {
+        exported.insert(
+            "databaseProfiles".into(),
+            serde_json::to_value(state.key_batch_profiles.read().await.clone())
+                .map_err(command_error)?,
+        );
+    }
+    let content = serde_json::to_string_pretty(&serde_json::json!({
+        "format": CONFIG_TRANSFER_FORMAT,
+        "version": 1,
+        "exportedAt": now(),
+        "sections": exported,
+    }))
+    .map_err(command_error)?;
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_file_name(format!(
+            "new-api-desktop-settings-{}.json",
+            Local::now().format("%Y-%m-%d")
+        ))
+        .add_filter("JSON", &["json"])
+        .save_file(move |path| {
+            let _ = sender.send(path);
+        });
+    let Some(path) = receiver.await.map_err(command_error)? else {
+        return Ok(false);
+    };
+    let mut options = OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    let mut file = app.fs().open(path, options).map_err(command_error)?;
+    file.write_all(content.as_bytes()).map_err(command_error)?;
+    file.flush().map_err(command_error)?;
+    Ok(true)
+}
+
+#[tauri::command]
+pub async fn import_configuration(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    sections: Vec<String>,
+) -> Result<bool, String> {
+    validate_transfer_sections(&sections)?;
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .add_filter("JSON", &["json"])
+        .pick_file(move |path| {
+            let _ = sender.send(path);
+        });
+    let Some(path) = receiver.await.map_err(command_error)? else {
+        return Ok(false);
+    };
+    let content = app.fs().read_to_string(path).map_err(command_error)?;
+    let document: Value = serde_json::from_str(&content).map_err(|_| "配置文件不是有效的 JSON")?;
+    if document.get("format").and_then(Value::as_str) != Some(CONFIG_TRANSFER_FORMAT)
+        || document.get("version").and_then(Value::as_u64) != Some(1)
+    {
+        return Err("不支持的配置文件格式或版本".into());
+    }
+    let imported = document
+        .get("sections")
+        .and_then(Value::as_object)
+        .ok_or("配置文件缺少 sections")?;
+
+    // Parse and validate every selected section before replacing any persisted data.
+    let backends = if selected_section(&sections, "backends") {
+        let value = imported
+            .get("backends")
+            .cloned()
+            .ok_or("配置文件不包含后端列表")?;
+        let mut value: BackendTransfer =
+            serde_json::from_value(value).map_err(|_| "后端列表格式无效")?;
+        let mut ids = HashSet::new();
+        for instance in &mut value.instances {
+            instance.base_url = normalize_base_url(&instance.base_url)?;
+            ensure_unique_id(&mut instance.id, &mut ids);
+        }
+        value
+            .instances
+            .retain(|instance| !instance.base_url.is_empty());
+        if !value
+            .instances
+            .iter()
+            .any(|instance| instance.id == value.active_instance_id)
+        {
+            value.active_instance_id = value
+                .instances
+                .first()
+                .map(|instance| instance.id.clone())
+                .unwrap_or_default();
+        }
+        value.active_flavor = if value.active_flavor == "classic" {
+            "classic".into()
+        } else {
+            "default".into()
+        };
+        Some(value)
+    } else {
+        None
+    };
+    let key_query_profiles = if selected_section(&sections, "keyQueryProfiles") {
+        let value = imported
+            .get("keyQueryProfiles")
+            .cloned()
+            .ok_or("配置文件不包含密钥查询配置档")?;
+        let mut profiles: Vec<KeyQueryProfile> =
+            serde_json::from_value(value).map_err(|_| "密钥查询配置档格式无效")?;
+        let mut ids = HashSet::new();
+        for profile in &mut profiles {
+            profile.base_url = normalize_base_url(&profile.base_url)?;
+            ensure_unique_id(&mut profile.id, &mut ids);
+        }
+        profiles.sort_by(|a, b| a.name.cmp(&b.name));
+        Some(profiles)
+    } else {
+        None
+    };
+    let database_profiles = if selected_section(&sections, "databaseProfiles") {
+        let value = imported
+            .get("databaseProfiles")
+            .cloned()
+            .ok_or("配置文件不包含数据库连接配置档")?;
+        let mut profiles: Vec<KeyBatchProfile> =
+            serde_json::from_value(value).map_err(|_| "数据库连接配置档格式无效")?;
+        let mut ids = HashSet::new();
+        for profile in &mut profiles {
+            if profile.host.trim().is_empty()
+                || profile.user.trim().is_empty()
+                || profile.database.trim().is_empty()
+                || profile.port == 0
+            {
+                return Err("数据库连接配置档包含无效的必填字段".into());
+            }
+            ensure_unique_id(&mut profile.id, &mut ids);
+        }
+        profiles.sort_by(|a, b| a.name.cmp(&b.name));
+        Some(profiles)
+    } else {
+        None
+    };
+
+    if let Some(backends) = backends {
+        {
+            let mut config = state.config.write().await;
+            config.instances = backends.instances;
+            config.active_instance_id = backends.active_instance_id;
+            config.active_flavor = backends.active_flavor;
+        }
+        persist_and_broadcast(&state).await?;
+    }
+    if let Some(profiles) = key_query_profiles {
+        state
+            .storage
+            .save_key_query_profiles(&profiles)
+            .map_err(command_error)?;
+        *state.key_query_profiles.write().await = profiles;
+    }
+    if let Some(profiles) = database_profiles {
+        state
+            .storage
+            .save_key_batch_profiles(&profiles)
+            .map_err(command_error)?;
+        *state.key_batch_profiles.write().await = profiles;
+        if let Some(pool) = state.mysql_pool.write().await.take() {
+            pool.close().await;
+        }
+    }
     Ok(true)
 }
 

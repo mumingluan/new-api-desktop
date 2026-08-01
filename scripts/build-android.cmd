@@ -37,7 +37,7 @@ call npx tauri android build --apk --target aarch64 --split-per-abi --ci %*
 if errorlevel 1 exit /b %errorlevel%
 
 set "UNSIGNED_APK=src-tauri\gen\android\app\build\outputs\apk\arm64\release\app-arm64-release-unsigned.apk"
-set "SIGNED_APK=src-tauri\gen\android\app\build\outputs\apk\arm64\release\New-API-Desktop_1.1.3_arm64-release.apk"
+set "SIGNED_APK=src-tauri\gen\android\app\build\outputs\apk\arm64\release\New-API-Desktop_1.1.4_arm64-release.apk"
 set "DEBUG_KEYSTORE=%USERPROFILE%\.android\debug.keystore"
 set "APKSIGNER="
 for /f "delims=" %%I in ('dir /b /ad /o-n "%ANDROID_HOME%\build-tools"') do (

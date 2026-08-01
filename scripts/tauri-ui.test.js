@@ -27,7 +27,7 @@ test('Android release permits the loopback proxy and avoids system cutouts', () 
   assert.match(configureScript, /@drawable\/ic_launcher_foreground_inset/)
   assert.match(configureScript, /android:insetLeft=\"8dp\"/)
   assert.match(buildScript, /apksigner\.bat/)
-  assert.match(buildScript, /New-API-Desktop_1\.1\.3_arm64-release\.apk/)
+  assert.match(buildScript, /New-API-Desktop_1\.1\.4_arm64-release\.apk/)
 
   const generatedRoot = path.join(root, 'src-tauri', 'gen', 'android', 'app')
   if (fs.existsSync(generatedRoot)) {
@@ -54,6 +54,31 @@ test('Android proxy pill controls are centered, draggable, and remember their po
   assert.match(proxy, /mobileControls\.setPointerCapture\(event\.pointerId\)/)
   assert.match(proxy, /__desktopBackButtonPosition/)
   assert.match(proxy, /Math\.min\(x, innerWidth - width - edge\)/)
+})
+
+test('mobile tool pages use a draggable back and refresh pill', () => {
+  const bridge = read('src-ui/tauri-bridge.js')
+
+  assert.match(bridge, /tauri-mobile-tool-controls/)
+  assert.match(bridge, /width: '82px', height: '38px'/)
+  assert.match(bridge, /controls\.addEventListener\('pointermove'/)
+  assert.match(bridge, /controls\.setPointerCapture\(event\.pointerId\)/)
+  assert.match(bridge, /__desktopToolButtonPosition/)
+  assert.match(bridge, /refresh\.addEventListener\('click', \(\) => window\.newApiDesktop\.reloadWindow\(\)\)/)
+})
+
+test('settings page offers selective configuration import and export', () => {
+  const html = read('src-ui/index.html')
+  const bridge = read('src-ui/tauri-bridge.js')
+  const commands = read('src-tauri/src/commands.rs')
+
+  for (const section of ['backends', 'keyQueryProfiles', 'databaseProfiles']) {
+    assert.match(html, new RegExp(`value="${section}"`))
+  }
+  assert.match(bridge, /export_configuration/)
+  assert.match(bridge, /import_configuration/)
+  assert.match(commands, /CONFIG_TRANSFER_FORMAT/)
+  assert.match(commands, /Parse and validate every selected section before replacing/)
 })
 
 test('frontend refresh keeps storage and reloads SPA routes through bundled assets', () => {

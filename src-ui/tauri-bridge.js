@@ -44,6 +44,8 @@
     executeKeyBatchOperation: (input) => invoke('execute_key_batch_operation', { input }),
     queryKeyBatchStats: (input) => invoke('query_key_batch_stats', { input }),
     exportKeyBatchCsv: (content) => invoke('export_csv', { content, kind: 'batch' }),
+    exportConfiguration: (sections) => invoke('export_configuration', { sections }),
+    importConfiguration: (sections) => invoke('import_configuration', { sections }),
     checkForUpdates: () => invoke('check_for_updates'),
     reloadWindow: () => invoke('reload_window'),
     toggleDevtools: () => invoke('toggle_devtools'),
@@ -75,18 +77,79 @@
   document.addEventListener('DOMContentLoaded', async () => {
     const config = await window.newApiDesktop.getConfig().catch(() => null)
     if (!config?.mobile || location.pathname === '/' || location.pathname.endsWith('/index.html') && !location.pathname.includes('key-')) return
-    const back = document.createElement('button')
-    back.type = 'button'
-    back.textContent = '‹'
-    back.title = '返回设置'
-    back.className = 'tauri-mobile-back'
-    Object.assign(back.style, {
+    const controls = document.createElement('div')
+    const makeButton = (label, icon) => {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.title = label
+      button.setAttribute('aria-label', label)
+      button.innerHTML = icon
+      Object.assign(button.style, {
+        display: 'grid', placeItems: 'center', width: '40px', height: '36px', minHeight: '36px',
+        padding: '0', border: '0', borderRadius: '18px', background: 'transparent', color: '#fff',
+        fontSize: '20px', lineHeight: '1', touchAction: 'none',
+      })
+      return button
+    }
+    const language = config.desktopLanguage === 'zh' || (config.desktopLanguage === 'auto' && navigator.language.toLowerCase().startsWith('zh')) ? 'zh' : 'en'
+    const back = makeButton(language === 'zh' ? '返回设置' : 'Back to settings', '&#x2039;')
+    const refresh = makeButton(language === 'zh' ? '刷新' : 'Refresh', '&#x21bb;')
+    const divider = document.createElement('span')
+    Object.assign(divider.style, { width: '1px', height: '20px', background: 'rgba(255,255,255,.24)' })
+    controls.append(back, divider, refresh)
+    controls.className = 'tauri-mobile-tool-controls'
+    Object.assign(controls.style, {
       position: 'fixed', left: '12px', top: '12px', zIndex: '2147483647',
-      width: '42px', height: '42px', borderRadius: '21px',
-      border: '1px solid rgba(127,127,127,.35)', background: 'rgba(20,20,20,.78)',
-      color: '#fff', fontSize: '30px', lineHeight: '34px',
+      display: 'flex', alignItems: 'center', width: '82px', height: '38px', padding: '0',
+      border: '1px solid rgba(255,255,255,.22)', borderRadius: '20px',
+      background: 'rgba(20,20,20,.82)', boxShadow: '0 8px 28px rgba(0,0,0,.28)',
+      backdropFilter: 'blur(12px)', cursor: 'grab', touchAction: 'none', userSelect: 'none',
     })
+    const storageKey = '__desktopToolButtonPosition'
+    let dragging = null
+    let moved = false
+    const clamp = (x, y) => {
+      const edge = 8
+      const width = controls.offsetWidth || 82
+      const height = controls.offsetHeight || 38
+      controls.style.left = `${Math.max(edge, Math.min(x, innerWidth - width - edge))}px`
+      controls.style.top = `${Math.max(edge, Math.min(y, innerHeight - height - edge))}px`
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || 'null')
+      if (Number.isFinite(saved?.x) && Number.isFinite(saved?.y)) clamp(saved.x, saved.y)
+    } catch (_) {}
+    controls.addEventListener('pointerdown', (event) => {
+      const bounds = controls.getBoundingClientRect()
+      dragging = { id: event.pointerId, dx: event.clientX - bounds.left, dy: event.clientY - bounds.top, startX: event.clientX, startY: event.clientY }
+      moved = false
+      controls.setPointerCapture(event.pointerId)
+      controls.style.cursor = 'grabbing'
+    })
+    controls.addEventListener('pointermove', (event) => {
+      if (!dragging || dragging.id !== event.pointerId) return
+      if (Math.hypot(event.clientX - dragging.startX, event.clientY - dragging.startY) > 5) moved = true
+      if (moved) clamp(event.clientX - dragging.dx, event.clientY - dragging.dy)
+    })
+    const finishDrag = (event) => {
+      if (!dragging || dragging.id !== event.pointerId) return
+      if (controls.hasPointerCapture(event.pointerId)) controls.releasePointerCapture(event.pointerId)
+      controls.style.cursor = 'grab'
+      if (moved) localStorage.setItem(storageKey, JSON.stringify({ x: parseFloat(controls.style.left), y: parseFloat(controls.style.top) }))
+      dragging = null
+      setTimeout(() => { moved = false }, 0)
+    }
+    controls.addEventListener('pointerup', finishDrag)
+    controls.addEventListener('pointercancel', finishDrag)
+    controls.addEventListener('click', (event) => {
+      if (moved) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+      }
+    }, true)
     back.addEventListener('click', () => window.newApiDesktop.openToolWindow('settings'))
-    document.body.append(back)
+    refresh.addEventListener('click', () => window.newApiDesktop.reloadWindow())
+    document.body.append(controls)
+    addEventListener('resize', () => clamp(parseFloat(controls.style.left), parseFloat(controls.style.top)))
   })
 })()

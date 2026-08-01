@@ -35,6 +35,23 @@ const dict = {
     launchClassic: 'Classic frontend',
     keyQuery: 'Key Query',
     keyBatch: 'Key Batch',
+    configurationBackup: 'Configuration import / export',
+    configurationBackupDescription: 'Back up or restore selected configuration sections.',
+    importConfig: 'Import',
+    exportConfig: 'Export',
+    selectConfigurationParts: 'Select the configuration sections to process.',
+    backendList: 'Backend list',
+    keyQueryProfiles: 'Key Query profiles',
+    databaseProfiles: 'Database connection profiles',
+    configurationSecretsWarning: 'Configuration files include saved access tokens, API keys, and database passwords. Keep them secure.',
+    cancel: 'Cancel',
+    exportSelected: 'Export selected',
+    importSelected: 'Import selected',
+    configurationExport: 'Configuration export',
+    configurationImport: 'Configuration import',
+    selectAtLeastOnePart: 'Select at least one configuration section.',
+    configurationExported: 'Configuration exported.',
+    configurationImported: 'Configuration imported.',
   },
   zh: {
     title: 'New API 桌面端',
@@ -67,6 +84,23 @@ const dict = {
     launchClassic: '经典前端',
     keyQuery: '密钥查询',
     keyBatch: '密钥批量操作',
+    configurationBackup: '配置导入 / 导出',
+    configurationBackupDescription: '按需备份或恢复指定配置。',
+    importConfig: '导入配置',
+    exportConfig: '导出配置',
+    selectConfigurationParts: '选择要处理的配置部分。',
+    backendList: '后端列表',
+    keyQueryProfiles: '密钥查询配置档',
+    databaseProfiles: '数据库连接配置档',
+    configurationSecretsWarning: '配置文件包含已保存的 Access Token、API 密钥和数据库密码，请妥善保管。',
+    cancel: '取消',
+    exportSelected: '导出所选',
+    importSelected: '导入所选',
+    configurationExport: '导出配置',
+    configurationImport: '导入配置',
+    selectAtLeastOnePart: '请至少选择一项配置。',
+    configurationExported: '配置已导出。',
+    configurationImported: '配置已导入。',
   },
   fr: {
     title: 'New API Desktop',
@@ -185,6 +219,23 @@ for (const language of ['fr', 'ja', 'ru', 'vi']) {
     launchClassic: dict.en.launchClassic,
     keyQuery: dict.en.keyQuery,
     keyBatch: dict.en.keyBatch,
+    configurationBackup: dict.en.configurationBackup,
+    configurationBackupDescription: dict.en.configurationBackupDescription,
+    importConfig: dict.en.importConfig,
+    exportConfig: dict.en.exportConfig,
+    selectConfigurationParts: dict.en.selectConfigurationParts,
+    backendList: dict.en.backendList,
+    keyQueryProfiles: dict.en.keyQueryProfiles,
+    databaseProfiles: dict.en.databaseProfiles,
+    configurationSecretsWarning: dict.en.configurationSecretsWarning,
+    cancel: dict.en.cancel,
+    exportSelected: dict.en.exportSelected,
+    importSelected: dict.en.importSelected,
+    configurationExport: dict.en.configurationExport,
+    configurationImport: dict.en.configurationImport,
+    selectAtLeastOnePart: dict.en.selectAtLeastOnePart,
+    configurationExported: dict.en.configurationExported,
+    configurationImported: dict.en.configurationImported,
   })
 }
 
@@ -373,6 +424,53 @@ $('launchClassic').addEventListener('click', async () => {
 
 $('openKeyQuery').addEventListener('click', () => api.openToolWindow('key-query'))
 $('openKeyBatch').addEventListener('click', () => api.openToolWindow('key-batch'))
+
+let configTransferMode = 'export'
+
+function openConfigTransfer(mode) {
+  configTransferMode = mode
+  $('configTransferTitle').textContent = tr(mode === 'export' ? 'configurationExport' : 'configurationImport')
+  $('confirmConfigTransfer').textContent = tr(mode === 'export' ? 'exportSelected' : 'importSelected')
+  $('configTransferDialog').showModal()
+}
+
+function closeConfigTransfer() {
+  $('configTransferDialog').close()
+}
+
+$('exportConfig').addEventListener('click', () => openConfigTransfer('export'))
+$('importConfig').addEventListener('click', () => openConfigTransfer('import'))
+$('closeConfigTransfer').addEventListener('click', closeConfigTransfer)
+$('cancelConfigTransfer').addEventListener('click', closeConfigTransfer)
+$('configTransferDialog').addEventListener('click', (event) => {
+  if (event.target === $('configTransferDialog')) closeConfigTransfer()
+})
+$('configTransferForm').addEventListener('submit', async (event) => {
+  event.preventDefault()
+  const sections = [...document.querySelectorAll('[name="configSection"]:checked')].map((input) => input.value)
+  if (!sections.length) {
+    setStatus(tr('selectAtLeastOnePart'))
+    return
+  }
+  const confirm = $('confirmConfigTransfer')
+  confirm.disabled = true
+  try {
+    const completed = configTransferMode === 'export'
+      ? await api.exportConfiguration(sections)
+      : await api.importConfiguration(sections)
+    if (!completed) return
+    closeConfigTransfer()
+    setStatus(tr(configTransferMode === 'export' ? 'configurationExported' : 'configurationImported'))
+    if (configTransferMode === 'import') {
+      selectedId = ''
+      await load()
+    }
+  } catch (err) {
+    setStatus(err.message)
+  } finally {
+    confirm.disabled = false
+  }
+})
 
 api.onConfigChanged((next) => {
   config = next

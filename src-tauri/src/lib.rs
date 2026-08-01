@@ -110,6 +110,8 @@ pub fn run() {
             commands::execute_key_batch_operation,
             commands::query_key_batch_stats,
             commands::export_csv,
+            commands::export_configuration,
+            commands::import_configuration,
             commands::check_for_updates,
             commands::reload_window,
             commands::toggle_devtools,

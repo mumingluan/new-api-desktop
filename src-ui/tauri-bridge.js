@@ -86,24 +86,28 @@
       button.innerHTML = icon
       Object.assign(button.style, {
         display: 'grid', placeItems: 'center', width: '40px', height: '36px', minHeight: '36px',
-        padding: '0', border: '0', borderRadius: '18px', background: 'transparent', color: '#fff',
-        fontSize: '20px', lineHeight: '1', touchAction: 'none',
+        padding: '0', border: '0', background: 'transparent', color: 'inherit',
+        lineHeight: '1', touchAction: 'none',
       })
       return button
     }
     const language = config.desktopLanguage === 'zh' || (config.desktopLanguage === 'auto' && navigator.language.toLowerCase().startsWith('zh')) ? 'zh' : 'en'
-    const back = makeButton(language === 'zh' ? '返回设置' : 'Back to settings', '&#x2039;')
-    const refresh = makeButton(language === 'zh' ? '刷新' : 'Refresh', '&#x21bb;')
+    const back = makeButton(language === 'zh' ? '返回设置' : 'Back to settings',
+      '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="20" height="20"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>')
+    const refresh = makeButton(language === 'zh' ? '刷新' : 'Refresh',
+      '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="19" height="19"><path d="M19 8a8 8 0 1 0 1 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M19 3v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>')
     const divider = document.createElement('span')
     Object.assign(divider.style, { width: '1px', height: '20px', background: 'rgba(255,255,255,.24)' })
     controls.append(back, divider, refresh)
     controls.className = 'tauri-mobile-tool-controls'
     Object.assign(controls.style, {
       position: 'fixed', left: '12px', top: '12px', zIndex: '2147483647',
-      display: 'flex', alignItems: 'center', width: '82px', height: '38px', padding: '0',
-      border: '1px solid rgba(255,255,255,.22)', borderRadius: '20px',
-      background: 'rgba(20,20,20,.82)', boxShadow: '0 8px 28px rgba(0,0,0,.28)',
-      backdropFilter: 'blur(12px)', cursor: 'grab', touchAction: 'none', userSelect: 'none',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      width: '82px', height: '38px', boxSizing: 'border-box', padding: '0',
+      border: '1px solid rgba(127,127,127,.38)', borderRadius: '19px',
+      background: 'rgba(20,20,20,.82)', color: '#fff', overflow: 'hidden',
+      boxShadow: '0 4px 14px rgba(0,0,0,.24)', backdropFilter: 'blur(8px)',
+      cursor: 'grab', touchAction: 'none', userSelect: 'none',
     })
     const storageKey = '__desktopToolButtonPosition'
     let dragging = null

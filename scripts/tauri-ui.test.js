@@ -32,7 +32,7 @@ test('Android release permits the loopback proxy and avoids system cutouts', () 
   assert.match(buildScript, /apksigner\.bat/)
   assert.match(buildScript, /if not exist \"src-tauri\\gen\\android\\gradle\.properties\"/)
   assert.match(buildScript, /npx tauri android init/)
-  assert.match(buildScript, /New-API-Desktop_1\.1\.6_arm64-release\.apk/)
+  assert.match(buildScript, /New-API-Desktop_1\.1\.7_arm64-release\.apk/)
 
   for (const density of ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
     for (const icon of ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png']) {
@@ -72,6 +72,11 @@ test('mobile tool pages use a draggable back and refresh pill', () => {
 
   assert.match(bridge, /tauri-mobile-tool-controls/)
   assert.match(bridge, /width: '82px', height: '38px'/)
+  assert.match(bridge, /d="M15 5 8 12l7 7"/)
+  assert.match(bridge, /d="M19 8a8 8 0 1 0 1 6"/)
+  assert.doesNotMatch(bridge, /&#x2039;|&#x21bb;/)
+  assert.match(bridge, /border: '1px solid rgba\(127,127,127,\.38\)'/)
+  assert.match(bridge, /boxShadow: '0 4px 14px rgba\(0,0,0,\.24\)'/)
   assert.match(bridge, /controls\.addEventListener\('pointermove'/)
   assert.match(bridge, /controls\.setPointerCapture\(event\.pointerId\)/)
   assert.match(bridge, /__desktopToolButtonPosition/)

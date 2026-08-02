@@ -1,6 +1,6 @@
 [package]
 name = "new-api-desktop"
-version = "1.1.6"
+version = "1.1.7"
 description = "New API cross-platform desktop and mobile client"
 authors = ["QuantumNous", "MUML"]
 license = "AGPL-3.0-or-later"

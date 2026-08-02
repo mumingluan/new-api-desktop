@@ -26,9 +26,18 @@ test('Android release permits the loopback proxy and avoids system cutouts', () 
   assert.match(configureScript, /view\.setPadding\(/)
   assert.match(configureScript, /@drawable\/ic_launcher_foreground_inset/)
   assert.match(configureScript, /android:insetLeft=\"8dp\"/)
-  assert.match(configureScript, /<color name=\"ic_launcher_background\">#FFFFFF<\/color>/)
+  assert.match(configureScript, /fs\.cpSync\(bundledAndroidIcons, resourceRoot/)
+  assert.match(configureScript, /cannot reset branding/)
   assert.match(buildScript, /apksigner\.bat/)
-  assert.match(buildScript, /New-API-Desktop_1\.1\.4_arm64-release\.apk/)
+  assert.match(buildScript, /if not exist \"src-tauri\\gen\\android\\gradle\.properties\"/)
+  assert.match(buildScript, /npx tauri android init/)
+  assert.match(buildScript, /New-API-Desktop_1\.1\.5_arm64-release\.apk/)
+
+  for (const density of ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
+    for (const icon of ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png']) {
+      assert.ok(fs.existsSync(path.join(root, 'src-tauri', 'icons', 'android', `mipmap-${density}`, icon)))
+    }
+  }
 
   const generatedRoot = path.join(root, 'src-tauri', 'gen', 'android', 'app')
   if (fs.existsSync(generatedRoot)) {

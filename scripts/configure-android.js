@@ -5,6 +5,8 @@ const projectRoot = path.resolve(__dirname, '..')
 const androidRoot = path.join(projectRoot, 'src-tauri', 'gen', 'android')
 const propertiesPath = path.join(androidRoot, 'gradle.properties')
 const appRoot = path.join(androidRoot, 'app')
+const resourceRoot = path.join(appRoot, 'src', 'main', 'res')
+const bundledAndroidIcons = path.join(projectRoot, 'src-tauri', 'icons', 'android')
 const gradlePath = path.join(appRoot, 'build.gradle.kts')
 const manifestPath = path.join(appRoot, 'src', 'main', 'AndroidManifest.xml')
 const activityPath = path.join(
@@ -33,18 +35,16 @@ const insetIconPath = path.join(
   'drawable',
   'ic_launcher_foreground_inset.xml',
 )
-const iconColorsPath = path.join(
-  appRoot,
-  'src',
-  'main',
-  'res',
-  'values',
-  'ic_launcher_colors.xml',
-)
-
 if (!fs.existsSync(propertiesPath)) {
   throw new Error('Android project is not initialized. Run `npm run android:init` first.')
 }
+if (!fs.existsSync(bundledAndroidIcons)) {
+  throw new Error('Bundled Android launcher icons are missing.')
+}
+
+// Android initialization ships Tauri template icons. Always replace them with the
+// project-owned mipmap set so regenerating the Android project cannot reset branding.
+fs.cpSync(bundledAndroidIcons, resourceRoot, { recursive: true, force: true })
 
 const readRequired = (filePath) => {
   if (!fs.existsSync(filePath)) {
@@ -173,12 +173,6 @@ writeIfChanged(insetIconPath, `<?xml version="1.0" encoding="utf-8"?>
     android:insetTop="8dp"
     android:insetRight="8dp"
     android:insetBottom="8dp" />
-`)
-
-writeIfChanged(iconColorsPath, `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-  <color name="ic_launcher_background">#FFFFFF</color>
-</resources>
 `)
 
 console.log('Configured Android Gradle, system insets, and adaptive icon assets.')

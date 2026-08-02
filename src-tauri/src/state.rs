@@ -64,7 +64,7 @@ impl AppState {
             .connect_timeout(std::time::Duration::from_secs(15))
             .timeout(std::time::Duration::from_secs(120))
             .redirect(reqwest::redirect::Policy::limited(10))
-            .user_agent("New-API-Desktop/1.1.7")
+            .user_agent("New-API-Desktop/1.1.8")
             .build()?;
         Ok(Arc::new(Self {
             app,

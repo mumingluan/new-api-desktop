@@ -34,7 +34,8 @@ const messages = {
     'Delete profile': '删除组合', 'Copy details': '复制信息', 'Key statistics': '密钥统计',
     'Token name': '令牌名称', 'Total quota': '总额度', Used: '已使用',
     'Remaining quota': '剩余额度', Expires: '有效期', 'Usage details': '调用详情',
-    'Per page': '每页', 'Export CSV': '导出 CSV', Time: '时间', Group: '分组', Model: '模型',
+    'Per page': '每页', 'Export CSV': '导出 CSV', Time: '时间', Status: '状态',
+    Success: '成功', Error: '错误', Group: '分组', Model: '模型',
     Duration: '用时', Streaming: '流式', Prompt: '提示', Completion: '补全', Cost: '花费',
     Ratios: '倍率', Details: '详情', 'Enter a server and key to begin': '输入服务器和密钥开始查询',
     Previous: '上一页', Next: '下一页', Unlimited: '无限', 'Never expires': '永不过期',
@@ -146,14 +147,17 @@ function renderLogs() {
     const row = document.createElement('tr')
     const cell = document.createElement('td')
     cell.className = 'empty'
-    cell.colSpan = 11
+    cell.colSpan = 12
     cell.textContent = result ? t('No usage records') : t('Enter a server and key to begin')
     row.append(cell)
     elements.logRows.append(row)
   } else {
     for (const item of rows) {
       const row = document.createElement('tr')
+      const isError = item.logType === 5
+      if (isError) row.className = 'error-row'
       setCell(row, formatTimestamp(item.createdAt))
+      setCell(row, isError ? t('Error') : t('Success'), 'log-status ' + (isError ? 'error' : 'success'))
       setCell(row, item.tokenName || '-')
       setCell(row, item.group || '-')
       setCell(row, item.modelName || '-')
@@ -163,7 +167,7 @@ function renderLogs() {
       setCell(row, String(item.completionTokens))
       setCell(row, quotaMoney(item.quota))
       setCell(row, `${item.modelRatio}x / ${item.groupRatio}x`)
-      setCell(row, item.content || '-', 'detail')
+      setCell(row, (isError ? item.errorReason : '') || item.content || '-', 'detail')
       elements.logRows.append(row)
     }
   }
@@ -248,9 +252,10 @@ function csvCell(value) {
 
 async function exportCsv() {
   if (!result?.logs?.length) return
-  const header = [t('Time'), t('Token name'), t('Group'), t('Model'), `${t('Duration')}(s)`, t('Streaming'), `${t('Prompt')} Token`, `${t('Completion')} Token`, t('Cost'), `${t('Model')} ${t('Ratios')}`, `${t('Group')} ${t('Ratios')}`, t('Details')]
+  const header = [t('Time'), t('Status'), t('Token name'), t('Group'), t('Model'), `${t('Duration')}(s)`, t('Streaming'), `${t('Prompt')} Token`, `${t('Completion')} Token`, t('Cost'), `${t('Model')} ${t('Ratios')}`, `${t('Group')} ${t('Ratios')}`, t('Details')]
   const rows = result.logs.map((item) => [
     formatTimestamp(item.createdAt),
+    item.logType === 5 ? t('Error') : t('Success'),
     item.tokenName,
     item.group,
     item.modelName,
@@ -261,7 +266,7 @@ async function exportCsv() {
     quotaMoney(item.quota),
     item.modelRatio,
     item.groupRatio,
-    item.content,
+    (item.logType === 5 ? item.errorReason : '') || item.content,
   ])
   const content = `\ufeff${[header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}`
   const saved = await window.newApiDesktop.exportKeyQueryCsv(content)

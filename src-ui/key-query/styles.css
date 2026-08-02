@@ -317,6 +317,22 @@ td.detail {
   text-overflow: ellipsis;
 }
 
+tr.error-row td {
+  background: color-mix(in srgb, var(--danger) 6%, transparent);
+}
+
+td.log-status {
+  font-weight: 700;
+}
+
+td.log-status.success {
+  color: var(--success);
+}
+
+td.log-status.error {
+  color: var(--danger);
+}
+
 td.empty {
   padding: 52px 16px;
   color: var(--muted);

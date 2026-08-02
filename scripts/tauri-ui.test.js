@@ -32,7 +32,7 @@ test('Android release permits the loopback proxy and avoids system cutouts', () 
   assert.match(buildScript, /apksigner\.bat/)
   assert.match(buildScript, /if not exist \"src-tauri\\gen\\android\\gradle\.properties\"/)
   assert.match(buildScript, /npx tauri android init/)
-  assert.match(buildScript, /New-API-Desktop_1\.1\.7_arm64-release\.apk/)
+  assert.match(buildScript, /New-API-Desktop_1\.1\.8_arm64-release\.apk/)
 
   for (const density of ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
     for (const icon of ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png']) {
@@ -65,6 +65,23 @@ test('Android proxy pill controls are centered, draggable, and remember their po
   assert.match(proxy, /mobileControls\.setPointerCapture\(event\.pointerId\)/)
   assert.match(proxy, /__desktopBackButtonPosition/)
   assert.match(proxy, /Math\.min\(x, innerWidth - width - edge\)/)
+})
+
+test('key query includes and highlights failed usage logs', () => {
+  const commands = read('src-tauri/src/commands.rs')
+  const models = read('src-tauri/src/models.rs')
+  const renderer = read('src-ui/key-query/renderer.js')
+  const html = read('src-ui/key-query/index.html')
+
+  assert.match(commands, /matches!\(value_i64\(row\.get\("type"\)\), 0 \| 2 \| 5\)/)
+  assert.match(commands, /\.get\("reason"\)/)
+  assert.match(models, /pub log_type: i64/)
+  assert.match(models, /pub error_reason: String/)
+  assert.match(renderer, /item\.logType === 5/)
+  assert.match(renderer, /item\.errorReason/)
+  assert.match(renderer, /error-row/)
+  assert.match(html, /data-i18n="Status"/)
+  assert.match(html, /colspan="12"/)
 })
 
 test('mobile tool pages use a draggable back and refresh pill', () => {

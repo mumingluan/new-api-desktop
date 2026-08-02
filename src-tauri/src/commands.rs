@@ -688,8 +688,9 @@ pub async fn query_token(
         .unwrap_or_default();
     let logs: Vec<KeyQueryLog> = rows
         .iter()
-        .filter(|row| matches!(value_i64(row.get("type")), 0 | 2))
+        .filter(|row| matches!(value_i64(row.get("type")), 0 | 2 | 5))
         .map(|row| {
+            let log_type = value_i64(row.get("type"));
             let other = row
                 .get("other")
                 .and_then(|value| {
@@ -701,6 +702,7 @@ pub async fn query_token(
                 })
                 .unwrap_or(Value::Null);
             KeyQueryLog {
+                log_type,
                 created_at: value_i64(row.get("created_at")),
                 token_name: row
                     .get("token_name")
@@ -728,6 +730,11 @@ pub async fn query_token(
                 quota: value_i64(row.get("quota")),
                 content: row
                     .get("content")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                error_reason: other
+                    .get("reason")
                     .and_then(Value::as_str)
                     .unwrap_or_default()
                     .to_string(),

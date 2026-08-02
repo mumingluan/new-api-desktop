@@ -104,7 +104,7 @@ npm run build:win
 
 ```text
 src-tauri/target/release/new-api-desktop.exe
-src-tauri/target/release/bundle/nsis/New API Desktop_1.1.7_x64-setup.exe
+src-tauri/target/release/bundle/nsis/New API Desktop_1.1.8_x64-setup.exe
 ```
 
 macOS：
@@ -156,7 +156,7 @@ npm run test:rust
 Android 设备安装：
 
 ```bash
-adb install -r src-tauri/gen/android/app/build/outputs/apk/arm64/release/New-API-Desktop_1.1.7_arm64-release.apk
+adb install -r src-tauri/gen/android/app/build/outputs/apk/arm64/release/New-API-Desktop_1.1.8_arm64-release.apk
 ```
 
 ## 配置文件

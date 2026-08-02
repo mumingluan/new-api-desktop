@@ -253,6 +253,7 @@ pub struct KeyBatchProfileInput {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyQueryLog {
+    pub log_type: i64,
     pub created_at: i64,
     pub token_name: String,
     pub group: String,
@@ -265,6 +266,7 @@ pub struct KeyQueryLog {
     pub model_ratio: f64,
     pub group_ratio: f64,
     pub content: String,
+    pub error_reason: String,
 }
 
 #[derive(Clone, Debug, Serialize)]

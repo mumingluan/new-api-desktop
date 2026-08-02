@@ -97,12 +97,6 @@ writeIfChanged(propertiesPath, `${updated.filter((line, index, all) => (
 let gradle = readRequired(gradlePath)
 gradle = insertIntoBlock(
   gradle,
-  'defaultConfig',
-  'manifestPlaceholders["usesCleartextTraffic"] = "true"',
-  /defaultConfig\s*\{[^}]*manifestPlaceholders\["usesCleartextTraffic"\]\s*=\s*"true"/s,
-)
-gradle = insertIntoBlock(
-  gradle,
   'getByName("release")',
   'isMinifyEnabled = true',
   /getByName\("release"\)\s*\{[^}]*isMinifyEnabled\s*=\s*true/s,
@@ -116,10 +110,15 @@ gradle = insertIntoBlock(
 writeIfChanged(gradlePath, gradle)
 
 let manifest = readRequired(manifestPath)
-if (!/android:usesCleartextTraffic="\$\{usesCleartextTraffic\}"/.test(manifest)) {
+if (/android:usesCleartextTraffic="[^"]*"/.test(manifest)) {
+  manifest = manifest.replace(
+    /android:usesCleartextTraffic="[^"]*"/,
+    'android:usesCleartextTraffic="true"',
+  )
+} else {
   manifest = manifest.replace(
     /(<application\s*)/,
-    '$1\n        android:usesCleartextTraffic="${usesCleartextTraffic}"',
+    '$1\n        android:usesCleartextTraffic="true"',
   )
 }
 writeIfChanged(manifestPath, manifest)

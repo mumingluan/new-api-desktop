@@ -18,7 +18,8 @@ test('Android release permits the loopback proxy and avoids system cutouts', () 
   const configureScript = read('scripts/configure-android.js')
   const buildScript = read('scripts/build-android.cmd')
 
-  assert.match(configureScript, /manifestPlaceholders\[\"usesCleartextTraffic\"\]/)
+  assert.match(configureScript, /android:usesCleartextTraffic=\"true\"/)
+  assert.doesNotMatch(configureScript, /manifestPlaceholders\[\"usesCleartextTraffic\"\]/)
   assert.match(configureScript, /isMinifyEnabled = true/)
   assert.match(configureScript, /isShrinkResources = true/)
   assert.match(configureScript, /WindowInsetsCompat\.Type\.systemBars\(\)/)
@@ -31,7 +32,7 @@ test('Android release permits the loopback proxy and avoids system cutouts', () 
   assert.match(buildScript, /apksigner\.bat/)
   assert.match(buildScript, /if not exist \"src-tauri\\gen\\android\\gradle\.properties\"/)
   assert.match(buildScript, /npx tauri android init/)
-  assert.match(buildScript, /New-API-Desktop_1\.1\.5_arm64-release\.apk/)
+  assert.match(buildScript, /New-API-Desktop_1\.1\.6_arm64-release\.apk/)
 
   for (const density of ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
     for (const icon of ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png']) {
@@ -41,11 +42,11 @@ test('Android release permits the loopback proxy and avoids system cutouts', () 
 
   const generatedRoot = path.join(root, 'src-tauri', 'gen', 'android', 'app')
   if (fs.existsSync(generatedRoot)) {
-    const gradle = read('src-tauri/gen/android/app/build.gradle.kts')
     const activity = read('src-tauri/gen/android/app/src/main/java/com/newapi/desktop/MainActivity.kt')
     const adaptiveIcon = read('src-tauri/gen/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml')
 
-    assert.match(gradle, /manifestPlaceholders\["usesCleartextTraffic"\]\s*=\s*"true"/)
+    const manifest = read('src-tauri/gen/android/app/src/main/AndroidManifest.xml')
+    assert.match(manifest, /android:usesCleartextTraffic="true"/)
     assert.match(activity, /WindowInsetsCompat\.Type\.systemBars\(\)/)
     assert.match(activity, /WindowInsetsCompat\.Type\.displayCutout\(\)/)
     assert.match(adaptiveIcon, /@drawable\/ic_launcher_foreground_inset/)
